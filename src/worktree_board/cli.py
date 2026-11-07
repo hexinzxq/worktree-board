@@ -1,0 +1,86 @@
+"""`wtree` — the command-line half of the board.
+
+Two verbs only: `ls` asks git and prints a table (or JSON), `serve` puts the
+same report behind a page. Nothing here writes to the repository.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+from .scan import GitError, report
+from .server import serve
+
+
+def _cell(text: str, width: int) -> str:
+    return text if len(text) <= width else text[: max(width - 1, 1)] + "…"
+
+
+def _table(data: dict) -> str:
+    rows = []
+    header = ("BRANCH", "DIRTY", "AHEAD", "BEHIND", "LAST COMMIT", "PATH")
+    widths = (28, 5, 5, 6, 46, 0)
+    for tree in data["worktrees"]:
+        branch = tree["branch"] or f"(detached {tree['head']})"
+        if tree["main"]:
+            branch += " *"
+        rows.append((
+            _cell(branch, widths[0]),
+            "-" if tree["dirty"] < 0 else str(tree["dirty"]),
+            "-" if tree["ahead"] is None else str(tree["ahead"]),
+            "-" if tree["behind"] is None else str(tree["behind"]),
+            _cell(tree["subject"], widths[4]),
+            tree["path"],
+        ))
+    table = ["  ".join(f"{header[i]:<{widths[i]}}" if widths[i] else header[i]
+                       for i in range(len(header)))]
+    for row in rows:
+        table.append("  ".join(f"{cell:<{widths[i]}}" if widths[i] else cell
+                               for i, cell in enumerate(row)))
+    totals = data["totals"]
+    table.append("")
+    table.append(f"{totals['count']} worktree(s), {totals['dirty']} dirty, "
+                 f"{totals['behind']} behind upstream   ({data['root']})")
+    return "\n".join(table)
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(prog="wtree", description="A read-only board over git worktrees.")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    ls = sub.add_parser("ls", help="print every worktree of the repository")
+    ls.add_argument("-C", "--root", default=".", metavar="PATH", help="any path inside the repository")
+    ls.add_argument("--json", action="store_true", help="machine-readable output")
+
+    srv = sub.add_parser("serve", help="serve the board on localhost")
+    srv.add_argument("-C", "--root", default=".", metavar="PATH", help="any path inside the repository")
+    srv.add_argument("--host", default="127.0.0.1")
+    srv.add_argument("--port", type=int, default=8765)
+
+    args = parser.parse_args(argv)
+    root = Path(args.root).resolve()
+
+    try:
+        if args.command == "ls":
+            data = report(root)
+            print(json.dumps(data, ensure_ascii=False, indent=2) if args.json else _table(data))
+            return 0
+        httpd = serve(root, args.host, args.port)
+        print(f"worktree-board  http://{args.host}:{httpd.server_address[1]}  ({root})")
+        print("ctrl-c to stop")
+        try:
+            httpd.serve_forever()
+        except KeyboardInterrupt:
+            pass
+        finally:
+            httpd.server_close()
+        return 0
+    except GitError as error:
+        print(f"wtree: {error}", file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":  # pragma: no cover
+    raise SystemExit(main())

@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "worktree-board"
+version = "0.1.0"
+description = "A read-only board over git worktrees: one worktree, one agent session."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "hexinzxq" }]
+dependencies = []
+
+[project.scripts]
+wtree = "worktree_board.cli:main"
+
+[project.optional-dependencies]
+dev = ["ruff>=0.6"]
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+worktree_board = ["static/*.html"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"

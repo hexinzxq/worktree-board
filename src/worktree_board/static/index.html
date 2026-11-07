@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>worktree-board</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0f1216;
+    --panel: #161b22;
+    --panel-2: #1c232c;
+    --line: #2a333f;
+    --text: #e6edf3;
+    --muted: #9aa7b4;
+    --accent: #6cb6ff;
+    --warn: #f0b429;
+    --danger: #ff7b72;
+    --ok: #3fb950;
+    --mono: ui-monospace, "SFMono-Regular", "SF Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100svh;
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.55 -apple-system, "Segoe UI", "Noto Sans SC", sans-serif;
+  }
+  header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 12px;
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--line);
+    background: var(--panel);
+  }
+  h1 { margin: 0; font-size: 18px; letter-spacing: .01em; }
+  .root { color: var(--muted); font: 13px var(--mono); overflow-wrap: anywhere; }
+  .stamp { margin-left: auto; color: var(--muted); font-size: 13px; }
+  main { padding: 24px; display: grid; gap: 16px; }
+  .totals { display: flex; flex-wrap: wrap; gap: 10px; }
+  .chip {
+    border: 1px solid var(--line);
+    background: var(--panel);
+    border-radius: 999px;
+    padding: 4px 12px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .chip b { color: var(--text); font-weight: 600; }
+  .board {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--panel);
+    overflow: hidden;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  caption { text-align: left; padding: 14px 16px; color: var(--muted); font-size: 13px; }
+  th, td { padding: 11px 16px; text-align: left; border-top: 1px solid var(--line); }
+  thead th { border-top: 0; color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+  td.path { font: 13px var(--mono); color: var(--muted); overflow-wrap: anywhere; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tr.main td { background: var(--panel-2); }
+  .badge { display: inline-block; margin-right: 6px; padding: 1px 8px; border-radius: 999px; font-size: 12px; border: 1px solid var(--line); }
+  .badge.dirty { color: var(--warn); border-color: var(--warn); }
+  .badge.behind { color: var(--danger); border-color: var(--danger); }
+  .badge.clean { color: var(--ok); border-color: var(--ok); }
+  .badge.main { color: var(--accent); border-color: var(--accent); }
+  .subject { color: var(--text); }
+  .when { color: var(--muted); font-size: 12px; }
+  code { font-family: var(--mono); font-size: 13px; color: var(--muted); }
+  .focusable:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .empty { padding: 18px 16px; color: var(--muted); }
+  footer { padding: 0 24px 28px; color: var(--muted); font-size: 13px; }
+  @media (max-width: 720px) {
+    main { padding: 16px; }
+    th:nth-child(4), td:nth-child(4), th:nth-child(5), td:nth-child(5) { display: none; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>worktree-board</h1>
+  <span class="root" id="root">正在读取…</span>
+  <span class="stamp" id="stamp"></span>
+</header>
+<main>
+  <div class="totals" id="totals"></div>
+  <section class="board" aria-label="worktrees">
+    <table>
+      <caption>一个 worktree = 一个会话。读的是 git 自己的状态，只读。</caption>
+      <thead>
+        <tr>
+          <th>分支</th><th>状态</th><th class="num">落后</th><th class="num">领先</th><th>最后提交</th><th>路径</th>
+        </tr>
+      </thead>
+      <tbody id="rows">
+        <tr><td colspan="6" class="empty">正在读取…</td></tr>
+      </tbody>
+    </table>
+  </section>
+</main>
+<footer>在仓库里跑 <code>wtree serve</code> 才会有这份东西；页面每 5 秒拉一次 <code>/api/state</code>。</footer>
+<script>
+  const rows = document.getElementById("rows");
+  const totals = document.getElementById("totals");
+  const root = document.getElementById("root");
+  const stamp = document.getElementById("stamp");
+
+  const esc = (value) => String(value ?? "").replace(/[&<>"]/g, (ch) => (
+    { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch]
+  ));
+
+  function stateOf(tree) {
+    const bits = [];
+    if (tree.main) bits.push('<span class="badge main">主</span>');
+    if (tree.dirty > 0) bits.push(`<span class="badge dirty">${tree.dirty} 改</span>`);
+    else if (tree.dirty === 0) bits.push('<span class="badge clean">净</span>');
+    if ((tree.behind ?? 0) > 0) bits.push('<span class="badge behind">落后</span>');
+    return bits.join("");
+  }
+
+  function render(data) {
+    root.textContent = data.root;
+    const t = data.totals;
+    totals.innerHTML = [
+      `<span class="chip"><b>${t.count}</b> 个 worktree</span>`,
+      `<span class="chip"><b>${t.dirty}</b> 个有未提交改动</span>`,
+      `<span class="chip"><b>${t.behind}</b> 个落后远程</span>`,
+    ].join("");
+    if (!data.worktrees.length) {
+      rows.innerHTML = '<tr><td colspan="6" class="empty">这个仓库还没有 worktree。</td></tr>';
+      return;
+    }
+    rows.innerHTML = data.worktrees.map((tree) => `
+      <tr class="${tree.main ? "main" : ""}">
+        <td>${esc(tree.branch ?? "(detached " + tree.head + ")")}</td>
+        <td>${stateOf(tree)}</td>
+        <td class="num">${tree.behind ?? "—"}</td>
+        <td class="num">${tree.ahead ?? "—"}</td>
+        <td><span class="subject">${esc(tree.subject || "—")}</span><br><span class="when">${esc((tree.committed_at || "").slice(0, 16).replace("T", " "))}</span></td>
+        <td class="path">${esc(tree.path)}</td>
+      </tr>`).join("");
+  }
+
+  async function poll() {
+    try {
+      const response = await fetch("/api/state", { cache: "no-store" });
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+      render(data);
+      stamp.textContent = "更新于 " + new Date().toLocaleTimeString("zh-CN", { hour12: false });
+    } catch (error) {
+      stamp.textContent = "读取失败：" + error.message;
+    }
+  }
+
+  poll();
+  setInterval(poll, 5000);
+</script>
+</body>
+</html>
