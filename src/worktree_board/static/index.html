@@ -143,7 +143,7 @@
         <td>${stateOf(tree)}</td>
         <td class="num">${tree.behind ?? "—"}</td>
         <td class="num">${tree.ahead ?? "—"}</td>
-        <td><span class="subject">${esc(tree.subject || "—")}</span><br><span class="when">${esc((tree.committed_at || "").slice(0, 16).replace("T", " "))}</span></td>
+        <td><span class="subject">${esc(tree.subject || (tree.head ? "—" : "(还没有提交)"))}</span><br><span class="when">${esc((tree.committed_at || "").slice(0, 16).replace("T", " "))}</span></td>
         <td class="path">${esc(tree.path)}</td>
       </tr>`).join("");
   }

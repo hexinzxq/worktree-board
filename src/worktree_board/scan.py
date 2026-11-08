@@ -128,17 +128,18 @@ def scan(repo: Path) -> list[Worktree]:
         path = Path(entry["path"])
         ahead, behind = _ahead_behind(path)
         subject, when = _last_commit(path)
+        unborn = bool(entry["head"]) and set(entry["head"]) == {"0"}
         out.append(Worktree(
             path=str(path),
             branch=entry["branch"],
-            head=entry["head"][:12],
+            head="" if unborn else entry["head"][:12],
             main=index == 0,
             locked=entry["locked"],
             prunable=entry["prunable"],
             dirty=_dirty_count(path),
             ahead=ahead,
             behind=behind,
-            subject=subject,
+            subject=subject or ("(no commits yet)" if unborn else ""),
             committed_at=when,
         ))
     return out

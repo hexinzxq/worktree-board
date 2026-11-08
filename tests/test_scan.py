@@ -44,6 +44,19 @@ class RepoCase(unittest.TestCase):
         return path
 
 
+class FreshRepoCase(unittest.TestCase):
+    """`git init` and nothing else: the state every repository starts in."""
+
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.repo = Path(self.tmp.name) / "fresh"
+        self.repo.mkdir()
+        git("init", "-b", "main", cwd=self.repo)
+
+    def tearDown(self) -> None:
+        self.tmp.cleanup()
+
+
 class ScanTests(RepoCase):
     def test_the_main_worktree_comes_first_and_is_clean(self) -> None:
         trees = scan(self.repo)
@@ -111,6 +124,23 @@ class ScanTests(RepoCase):
         self.assertEqual(data["totals"]["behind"], 0)
         self.assertEqual(len(data["worktrees"]), 2)
         self.assertIn("root", data)
+
+
+class FreshRepoScanTests(FreshRepoCase):
+    def test_a_repository_without_commits_says_so(self) -> None:
+        trees = scan(self.repo)
+        self.assertEqual(len(trees), 1)
+        self.assertEqual(trees[0].branch, "main")
+        self.assertEqual(trees[0].head, "")  # not a row of zeroes
+        self.assertEqual(trees[0].subject, "(no commits yet)")
+        self.assertEqual(trees[0].committed_at, "")
+        self.assertEqual(trees[0].dirty, 0)
+
+    def test_the_table_does_not_leave_the_cell_blank(self) -> None:
+        from worktree_board.cli import _table
+        out = _table(report(self.repo))
+        self.assertIn("(no commits yet)", out)
+        self.assertNotIn("000000000000", out)
 
 
 if __name__ == "__main__":
