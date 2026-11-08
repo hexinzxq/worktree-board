@@ -8,6 +8,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import time
 from pathlib import Path
 
 from .scan import GitError, report
@@ -46,6 +47,17 @@ def _table(data: dict) -> str:
     return "\n".join(table)
 
 
+def _watch(root: Path, interval: float) -> int:
+    """Redraw the table until ctrl-c. Clearing first keeps the cursor at home."""
+    try:
+        while True:
+            sys.stdout.write("\033[2J\033[H" + _table(report(root)) + "\n")
+            sys.stdout.flush()
+            time.sleep(interval)
+    except KeyboardInterrupt:
+        return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="wtree", description="A read-only board over git worktrees.")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -53,6 +65,10 @@ def main(argv: list[str] | None = None) -> int:
     ls = sub.add_parser("ls", help="print every worktree of the repository")
     ls.add_argument("-C", "--root", default=".", metavar="PATH", help="any path inside the repository")
     ls.add_argument("--json", action="store_true", help="machine-readable output")
+    ls.add_argument("--watch", action="store_true",
+                    help="redraw in place until ctrl-c (for a terminal already open)")
+    ls.add_argument("--interval", type=float, default=1.0, metavar="SECONDS",
+                    help="seconds between redraws with --watch (default 1.0)")
 
     srv = sub.add_parser("serve", help="serve the board on localhost")
     srv.add_argument("-C", "--root", default=".", metavar="PATH", help="any path inside the repository")
@@ -64,6 +80,14 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         if args.command == "ls":
+            if args.watch and args.json:
+                print("error: --watch draws a table; drop --json", file=sys.stderr)
+                return 2
+            if args.watch and args.interval <= 0:
+                print("error: --interval must be positive", file=sys.stderr)
+                return 2
+            if args.watch:
+                return _watch(root, args.interval)
             data = report(root)
             print(json.dumps(data, ensure_ascii=False, indent=2) if args.json else _table(data))
             return 0
