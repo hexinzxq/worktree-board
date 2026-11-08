@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import subprocess
 from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -43,6 +44,7 @@ class Worktree:
     behind: int | None
     subject: str  # last commit subject
     committed_at: str  # ISO 8601 of the last commit
+    fetched_at: str  # ISO 8601 of the last fetch; "" when never fetched
 
     def as_json(self) -> dict:
         return asdict(self)
@@ -109,6 +111,28 @@ def _ahead_behind(path: Path) -> tuple[int | None, int | None]:
     return ahead, behind
 
 
+def _fetched_at(path: Path) -> str:
+    """When this clone last talked to a remote — the age of the ahead/behind numbers.
+
+    `git rev-list @{upstream}...HEAD` compares local refs only. On a clone that
+    has not fetched for a week, "0 behind" is a true statement about a stale
+    snapshot, which is why the number is printed with the date it was taken.
+    """
+    if not path.is_dir():
+        return ""
+    done = _git(["rev-parse", "--git-common-dir"], path)
+    if done.returncode != 0:
+        return ""
+    common = Path(done.stdout.strip())
+    if not common.is_absolute():
+        common = (path / common)
+    stamp = common / "FETCH_HEAD"
+    try:
+        return datetime.fromtimestamp(stamp.stat().st_mtime, tz=timezone.utc).isoformat(timespec="seconds")
+    except OSError:
+        return ""
+
+
 def _last_commit(path: Path) -> tuple[str, str]:
     if not path.is_dir():
         return "", ""
@@ -141,6 +165,7 @@ def scan(repo: Path) -> list[Worktree]:
             behind=behind,
             subject=subject or ("(no commits yet)" if unborn else ""),
             committed_at=when,
+            fetched_at=_fetched_at(path),
         ))
     return out
 

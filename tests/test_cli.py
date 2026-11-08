@@ -15,7 +15,7 @@ from pathlib import Path
 
 from worktree_board.cli import main
 
-from .test_scan import RepoCase
+from .test_scan import RepoCase, git
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -60,6 +60,25 @@ class LsTests(RepoCase):
         code, out = run("ls", "-C", str(self.repo), "--watch", "--interval", "0")
         self.assertEqual(code, 2)
         self.assertIn("must be positive", out)
+
+    def test_a_stale_behind_count_says_how_stale_it_is(self) -> None:
+        upstream = self.base / "upstream"
+        upstream.mkdir()
+        git("init", "-b", "main", "--bare", cwd=upstream)
+        git("remote", "add", "origin", str(upstream), cwd=self.repo)
+        git("push", "-u", "origin", "main", cwd=self.repo)
+        other = self.base / "other"
+        git("clone", str(upstream), str(other), cwd=self.base)
+        git("config", "user.email", "o@example.com", cwd=other)
+        git("config", "user.name", "o", cwd=other)
+        (other / "theirs.txt").write_text("x\n")
+        git("add", ".", cwd=other)
+        git("commit", "-m", "their work", cwd=other)
+        git("push", "origin", "main", cwd=other)
+        git("fetch", "origin", cwd=self.repo)
+        code, out = run("ls", "-C", str(self.repo))
+        self.assertEqual(code, 0)
+        self.assertIn("behind is measured against the last fetch", out)
 
     def test_a_busy_port_is_a_message_not_a_traceback(self) -> None:
         # A dev server already running on 8765 is the normal way to meet this.

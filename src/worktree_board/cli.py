@@ -48,6 +48,11 @@ def _table(data: dict) -> str:
     table.append("")
     table.append(f"{totals['count']} worktree(s), {totals['dirty']} dirty, "
                  f"{totals['behind']} behind upstream   ({data['root']})")
+    if totals["behind"]:
+        newest = max((tree["fetched_at"] for tree in data["worktrees"] if tree["fetched_at"]), default="")
+        since = f" (newest fetch {newest[:16].replace('T', ' ')})" if newest else ""
+        table.append(f"note: behind is measured against the last fetch{since} — "
+                     f"run `git fetch` for a fresher number")
     if totals.get("prunable"):
         table.append(f"note: {totals['prunable']} worktree(s) no longer exist on disk — "
                      f"run `git worktree prune` to forget them")

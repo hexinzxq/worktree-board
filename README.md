@@ -42,7 +42,7 @@ wtree serve            # 打开 http://127.0.0.1:8765
 - `GET /` → 单页 UI（`src/worktree_board/static/index.html`）
 - 其余路径 → 404 JSON
 
-每个 worktree 的字段：`path`、`branch`（detached 时为 `null`）、`head`、`main`、`locked`、`prunable`、`dirty`、`ahead`/`behind`（无 upstream 时为 `null`）、`subject`、`committed_at`。
+每个 worktree 的字段：`path`、`branch`（detached 时为 `null`）、`head`（还没有提交时为空）、`main`、`locked`、`prunable`、`dirty`、`ahead`/`behind`（无 upstream 时为 `null`）、`subject`、`committed_at`、`fetched_at`（上次 fetch 的时间，从没 fetch 过为空——`behind` 是相对那次快照算的）。
 
 ## 设计取舍
 

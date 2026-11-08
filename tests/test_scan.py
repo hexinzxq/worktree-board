@@ -100,6 +100,28 @@ class ScanTests(RepoCase):
         self.assertEqual(trees["feature-login"].behind, 0)
         self.assertEqual(trees["feature-login"].subject, "local work")
 
+    def test_behind_is_stamped_with_the_last_fetch(self) -> None:
+        # "0 behind" on a clone nobody fetched for a week is true but useless;
+        # the report has to carry the date the number was taken.
+        upstream = self.base / "upstream"
+        upstream.mkdir()
+        git("init", "-b", "main", "--bare", cwd=upstream)
+        git("remote", "add", "origin", str(upstream), cwd=self.repo)
+        git("push", "-u", "origin", "main", cwd=self.repo)
+        other = self.base / "other"
+        git("clone", str(upstream), str(other), cwd=self.base)
+        git("config", "user.email", "o@example.com", cwd=other)
+        git("config", "user.name", "o", cwd=other)
+        (other / "theirs.txt").write_text("x\n")
+        git("add", ".", cwd=other)
+        git("commit", "-m", "their work", cwd=other)
+        git("push", "origin", "main", cwd=other)
+        git("fetch", "origin", cwd=self.repo)
+        tree = scan(self.repo)[0]
+        self.assertEqual(tree.behind, 1)
+        self.assertNotEqual(tree.fetched_at, "")
+        self.assertIn("T", tree.fetched_at)  # ISO 8601, not the raw epoch
+
     def test_a_worktree_deleted_from_disk_is_prunable_not_healthy(self) -> None:
         # `git worktree list` still shows it; the directory is gone. Calling that
         # "clean" is the one lie the table must not tell.

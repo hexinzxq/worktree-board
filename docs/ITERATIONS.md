@@ -35,3 +35,9 @@
 - **改了什么**：`scan()` 认出 unborn HEAD（porcelain 里 `HEAD` 全是 0），`head` 置空串、`subject` 写成 `(no commits yet)`；页面在没有 head 时显示「(还没有提交)」而不是一个空单元格。新增 2 个用例（unborn 仓库的字段、表格里不出现 `000000000000`、也不留空）。
 - **为什么**：`git init` 完立刻打开看板，是这个工具最先被用到的场景之一（今天新起的仓库就是这样）。原来的输出是一行：分支 main、最后提交空白、head 是一串 0 —— 看着像工具坏了，其实只是「还没有提交」。空白比错误更糟，因为它不解释自己。
 - **验证**：19 个测试全过；真仓库复跑（临时 `git init` + report），`subject` 与表格都对上了。推送仍然卡在网络，见当天汇报。
+
+### #5 「落后 0」到底什么时候算的
+
+- **改了什么**：`scan()` 新增 `fetched_at`——读 `git rev-parse --git-common-dir` 下 `FETCH_HEAD` 的 mtime，转成 ISO 时间；`_table()` 在 `behind > 0` 时补一行 `note: behind is measured against the last fetch (…newest…) — run git fetch for a fresher number`；README 字段表补上这个字段。新增 2 个用例（推一次再 fetch 后 behind 是 1 且 `fetched_at` 非空、表格出现那句 note）。
+- **为什么**：`@{upstream}` 比的是本地引用。三天没 fetch 的克隆上「落后 0」是句真话，但说的是三天前的快照——看板给数字不给新鲜度，等于让人拿旧地图找路。这一条和第 2 条是同一个毛病：数字本身对，读者理解错。
+- **验证**：21 个测试全过（upstream 用裸仓库 + 另一个克隆推一次来造「落后 1」的真实局面）。推送仍受网络影响，见当天收口汇报。
