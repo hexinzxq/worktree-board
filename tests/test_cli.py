@@ -5,6 +5,7 @@ import contextlib
 import io
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -41,6 +42,15 @@ class LsTests(RepoCase):
         data = json.loads(out)
         self.assertEqual(data["totals"]["count"], 2)
         self.assertEqual(data["worktrees"][1]["branch"], "feature-login")
+
+    def test_a_prunable_worktree_is_named_in_the_row_and_the_note(self) -> None:
+        path = self.add_worktree("gone")
+        shutil.rmtree(path)
+        code, out = run("ls", "-C", str(self.repo))
+        self.assertEqual(code, 0)
+        self.assertIn("gone (prunable)", out)
+        self.assertIn("git worktree prune", out)
+        self.assertEqual(out.count("note:"), 1)
 
     def test_watch_refuses_json_and_a_nonpositive_interval(self) -> None:
         code, out = run("ls", "-C", str(self.repo), "--watch", "--json")

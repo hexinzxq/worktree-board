@@ -119,6 +119,8 @@
     if (tree.dirty > 0) bits.push(`<span class="badge dirty">${tree.dirty} 改</span>`);
     else if (tree.dirty === 0) bits.push('<span class="badge clean">净</span>');
     if ((tree.behind ?? 0) > 0) bits.push('<span class="badge behind">落后</span>');
+    if (tree.prunable) bits.push('<span class="badge behind">已不存在</span>');
+    if (tree.locked) bits.push('<span class="badge dirty">锁定</span>');
     return bits.join("");
   }
 
@@ -129,6 +131,7 @@
       `<span class="chip"><b>${t.count}</b> 个 worktree</span>`,
       `<span class="chip"><b>${t.dirty}</b> 个有未提交改动</span>`,
       `<span class="chip"><b>${t.behind}</b> 个落后远程</span>`,
+      `<span class="chip"><b>${t.prunable}</b> 个已不存在</span>`,
     ].join("");
     if (!data.worktrees.length) {
       rows.innerHTML = '<tr><td colspan="6" class="empty">这个仓库还没有 worktree。</td></tr>';

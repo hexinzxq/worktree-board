@@ -44,6 +44,7 @@ class ServerTests(RepoCase):
         self.assertIn("application/json", content_type)
         data = json.loads(body)
         self.assertEqual(data["totals"]["count"], 2)
+        self.assertEqual(data["totals"]["prunable"], 0)
         self.assertEqual(len(data["worktrees"]), 2)
         self.assertEqual(data["worktrees"][0]["branch"], "main")
 

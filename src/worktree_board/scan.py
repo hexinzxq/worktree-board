@@ -154,5 +154,7 @@ def report(repo: Path) -> dict:
             "count": len(trees),
             "dirty": sum(1 for tree in trees if tree.dirty > 0),
             "behind": sum(1 for tree in trees if (tree.behind or 0) > 0),
+            "prunable": sum(1 for tree in trees if tree.prunable),
+            "locked": sum(1 for tree in trees if tree.locked),
         },
     }

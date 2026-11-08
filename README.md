@@ -10,7 +10,7 @@
 
 ## 长什么样
 
-- `wtree ls` — 表格（或 `--json`）列出全部 worktree：分支、改动数、领先/落后、最后提交
+- `wtree ls` — 表格（或 `--json`）列出全部 worktree：分支、改动数、领先/落后、最后提交；目录已经被删掉的 worktree 标 `(prunable)` 并在表尾提示 `git worktree prune`
 - `wtree ls --watch` — 同一个表在终端里原地刷（默认 1 秒），不用开浏览器
 - `wtree serve` — 同一份数据起在 `http://127.0.0.1:8765`，一个页面，只读
 - 零第三方依赖：标准库 + `git` 命令行，`pip install -e .` 之后就能跑
@@ -38,7 +38,7 @@ wtree serve            # 打开 http://127.0.0.1:8765
 
 ## HTTP 接口
 
-- `GET /api/state` → `{"root": ..., "worktrees": [...], "totals": {"count", "dirty", "behind"}}`
+- `GET /api/state` → `{"root": ..., "worktrees": [...], "totals": {"count", "dirty", "behind", "prunable", "locked"}}`
 - `GET /` → 单页 UI（`src/worktree_board/static/index.html`）
 - 其余路径 → 404 JSON
 

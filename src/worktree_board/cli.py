@@ -27,6 +27,10 @@ def _table(data: dict) -> str:
         branch = tree["branch"] or f"(detached {tree['head']})"
         if tree["main"]:
             branch += " *"
+        if tree["prunable"]:
+            branch += " (prunable)"
+        if tree["locked"]:
+            branch += " (locked)"
         rows.append((
             _cell(branch, widths[0]),
             "-" if tree["dirty"] < 0 else str(tree["dirty"]),
@@ -44,6 +48,9 @@ def _table(data: dict) -> str:
     table.append("")
     table.append(f"{totals['count']} worktree(s), {totals['dirty']} dirty, "
                  f"{totals['behind']} behind upstream   ({data['root']})")
+    if totals.get("prunable"):
+        table.append(f"note: {totals['prunable']} worktree(s) no longer exist on disk — "
+                     f"run `git worktree prune` to forget them")
     return "\n".join(table)
 
 

@@ -1,6 +1,7 @@
 """scan.py talks to git; these tests build a real repository to talk to."""
 from __future__ import annotations
 
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -85,6 +86,16 @@ class ScanTests(RepoCase):
         self.assertEqual(trees["feature-login"].ahead, 1)
         self.assertEqual(trees["feature-login"].behind, 0)
         self.assertEqual(trees["feature-login"].subject, "local work")
+
+    def test_a_worktree_deleted_from_disk_is_prunable_not_healthy(self) -> None:
+        # `git worktree list` still shows it; the directory is gone. Calling that
+        # "clean" is the one lie the table must not tell.
+        path = self.add_worktree("gone")
+        shutil.rmtree(path)
+        trees = {tree.branch: tree for tree in scan(self.repo)}
+        self.assertTrue(trees["gone"].prunable)
+        self.assertEqual(trees["gone"].dirty, -1)
+        self.assertEqual(report(self.repo)["totals"]["prunable"], 1)
 
     def test_a_path_outside_a_repository_is_a_git_error(self) -> None:
         with tempfile.TemporaryDirectory() as outside:
