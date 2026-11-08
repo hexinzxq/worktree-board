@@ -6,6 +6,7 @@ import io
 import json
 import os
 import shutil
+import socket
 import subprocess
 import sys
 import time
@@ -59,6 +60,21 @@ class LsTests(RepoCase):
         code, out = run("ls", "-C", str(self.repo), "--watch", "--interval", "0")
         self.assertEqual(code, 2)
         self.assertIn("must be positive", out)
+
+    def test_a_busy_port_is_a_message_not_a_traceback(self) -> None:
+        # A dev server already running on 8765 is the normal way to meet this.
+        holder = socket.socket()
+        holder.bind(("127.0.0.1", 0))
+        holder.listen(1)
+        port = holder.getsockname()[1]
+        try:
+            code, out = run("serve", "-C", str(self.repo), "--port", str(port))
+        finally:
+            holder.close()
+        self.assertEqual(code, 2)
+        self.assertIn("cannot listen on", out)
+        self.assertIn(str(port), out)
+        self.assertNotIn("Traceback", out)
 
     def test_watch_keeps_redrawing_until_it_is_stopped(self) -> None:
         # A terminal already open should not need a browser. Run the real CLI

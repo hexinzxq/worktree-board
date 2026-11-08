@@ -98,7 +98,13 @@ def main(argv: list[str] | None = None) -> int:
             data = report(root)
             print(json.dumps(data, ensure_ascii=False, indent=2) if args.json else _table(data))
             return 0
-        httpd = serve(root, args.host, args.port)
+        try:
+            httpd = serve(root, args.host, args.port)
+        except OSError as error:
+            reason = error.strerror or str(error)
+            print(f"error: cannot listen on {args.host}:{args.port} — {reason}. "
+                  f"Pass --port to pick another.", file=sys.stderr)
+            return 2
         print(f"worktree-board  http://{args.host}:{httpd.server_address[1]}  ({root})")
         print("ctrl-c to stop")
         try:

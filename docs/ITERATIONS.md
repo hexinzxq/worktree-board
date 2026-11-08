@@ -23,3 +23,9 @@
 - **改了什么**：`report()["totals"]` 增加 `prunable` / `locked` 计数；`_table()` 给行加 `(prunable)` / `(locked)` 标记，表尾多一行提示 `git worktree prune`；页面状态列加「已不存在」「锁定」徽章，顶部 chips 多一格「N 个已不存在」。新增 3 个断言（scan 认得上、表格说出来、API 计数在）。
 - **为什么**：`git worktree list` 对目录已经被删掉的 worktree 仍然列着，porcelain 里带 `prunable`。原来的表把它画成 `dirty=-`、落后 `-` 的行，跟一个干净的正常 worktree 几乎一样——看板最不该干的就是「有问题的东西看起来没问题」。这次的输入是临时仓库里 `worktree add` 之后把目录删掉，两行输出对比很直白。
 - **验证**：16 个测试全过；真仓库复跑，`gone (prunable)` 行 + 表尾 note 都在；页面 totals 多了 `prunable: 0` 字段（老的 API 消费方照常读前三个键）。推送仍受网络影响，见当天汇报。
+
+### #3 端口被占的时候，它选择甩一个 traceback
+
+- **改了什么**：`cli.py` 的 `serve` 分支把 `serve()` 包进 `try/except OSError`：端口占用（`EADDRINUSE`）或绑定失败时打 `error: cannot listen on 127.0.0.1:8765 — Address already in use. Pass --port to pick another.`，退出 2，不再输出栈。新增 1 个用例（先占一个端口再跑 `serve --port`，断言退出码 2、有提示、没有 `Traceback`）。
+- **为什么**：8765 是个常用端口，第二次 `wtree serve` 撞上它是这个工具最正常的意外。原来的行为是 `OSError` 一路冒到顶层，退出码 1，用户看到十几行栈才反应过来「哦，原来已经开着了」。错误信息应该先说人话。
+- **验证**：17 个测试全过；手复现：先占端口再起，现在是一行提示 + exit 2。推送到远程仍受网络影响，见当天汇报。
