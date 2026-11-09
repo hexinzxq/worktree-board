@@ -118,6 +118,24 @@ class LsTests(RepoCase):
         self.assertEqual(code, 0)
         self.assertIn("behind is measured against the last fetch", out)
 
+    def test_a_deleted_upstream_reads_as_gone(self) -> None:
+        upstream = self.base / "upstream2"
+        upstream.mkdir()
+        git("init", "-q", "--bare", cwd=upstream)
+        git("remote", "add", "origin", str(upstream), cwd=self.repo)
+        git("push", "-qu", "origin", "main", cwd=self.repo)
+        git("checkout", "-qb", "feature", cwd=self.repo)
+        (self.repo / "new.txt").write_text("x\n")
+        git("add", ".", cwd=self.repo)
+        git("commit", "-qm", "work", cwd=self.repo)
+        git("push", "-qu", "origin", "feature", cwd=self.repo)
+        git("push", "origin", "--delete", "feature", cwd=self.repo)
+        git("fetch", "--prune", "origin", cwd=self.repo)
+        code, out = run("ls", "-C", str(self.repo))
+        self.assertEqual(code, 0)
+        self.assertIn("gone", out)
+        self.assertIn("upstream branch missing", out)
+
     def test_a_busy_port_is_a_message_not_a_traceback(self) -> None:
         # A dev server already running on 8765 is the normal way to meet this.
         holder = socket.socket()

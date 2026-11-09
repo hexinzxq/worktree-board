@@ -55,7 +55,7 @@ def _table(data: dict) -> str:
             _cell(branch, widths[0]),
             "-" if tree["dirty"] < 0 else str(tree["dirty"]),
             "-" if tree["ahead"] is None else str(tree["ahead"]),
-            "-" if tree["behind"] is None else str(tree["behind"]),
+            "gone" if tree.get("upstream_gone") else ("-" if tree["behind"] is None else str(tree["behind"])),
             _cell(tree["subject"], widths[4]),
             tree["path"],
         ))
@@ -73,6 +73,9 @@ def _table(data: dict) -> str:
         since = f" (newest fetch {newest[:16].replace('T', ' ')})" if newest else ""
         table.append(f"note: behind is measured against the last fetch{since} — "
                      f"run `git fetch` for a fresher number")
+    if any(tree.get("upstream_gone") for tree in data["worktrees"]):
+        table.append("note: upstream branch missing (deleted on the remote, or not fetched yet) — "
+                     "`git branch -u origin/<branch>` to re-point it")
     if totals.get("prunable"):
         table.append(f"note: {totals['prunable']} worktree(s) no longer exist on disk — "
                      f"run `git worktree prune` to forget them")

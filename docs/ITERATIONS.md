@@ -53,3 +53,15 @@
 - **改了什么**：`static/index.html` 在统计条下面加一行说明——只要有落后，就写出「对着最后一次 fetch 的引用算的（时间）；要更准就 git fetch 一次」，没有拉取记录时写「还没 fetch 过」。新增 1 个用例（页面里必须同时出现 `fetched_at`、「最后一次 fetch」和 `id="fresh"`，防止以后改版把它悄悄删掉）。
 - **为什么**：第 5 条只把新鲜度补给了终端表格，网页那边还在裸报「落后 3」。同一个数字在两个前端里说不一样的话，用户会以为表格在甩锅。
 - **验证**：24 个测试全过；顺手拿自己的 sloplint 扫了页面，`clean: 0 tell(s) wairable, 0 failures`。
+
+### #8 「不在仓库里」和「这是个裸仓库」不是一句话
+
+- **改了什么**：`repo_root()` 原来把 `git rev-parse --show-toplevel` 的 stderr 原样抛出来（`git rev-parse … failed in /private/tmp: fatal: not a git repository…`）。现在分三种情形说人话：工作树（正常返回）、裸仓库（`is a bare repository — it has no worktrees to show`）、`-C` 指到了 `.git` 目录（`is a git directory, not a working tree — pass the repository root`）、其余 `is not inside a git repository`。新增 3 个用例各覆盖一句。
+- **为什么**：这三种情况用户要做的下一步完全不同——换目录、去裸仓库的兄弟目录、或者把 `.git` 去掉。原样抛 git 的英文 stderr，等于让人自己猜。
+- **验证**：29 个测试全过；`ls -C /tmp`、`ls -C bare.git`、`ls -C repo/.git` 三条真路径手跑过，文案对得上。
+
+### #9 上游分支被删了，别报「落后 0」
+
+- **改了什么**：`_ahead_behind()` 多返回一个 `upstream_gone`。`@{upstream}` 不可用时不再一律当成「没有上游」，而是查 `branch.<名>.remote` / `.merge` 配置——配置还在、远端追踪引用没了（`fetch --prune` 之后就是被删了），标记 `upstream_gone`；表格的 BEHIND 列写 `gone` 并在表尾提示怎么重新指上游，页面加「上游已删」徽章并把那格写 `gone`。新增 2 个用例（裸仓库造「推上去→远端删分支→prune」，字段和表格各验一次）。
+- **为什么**：PR 合完、远端分支删掉，本地分支的 upstream 配置还在。原来这时 ahead/behind 都是 `null`，表格显示 `-`，读者会理解成「不在跟踪任何上游」，实际是「跟踪的那个已经没了」——下一步该做的是重新指上游或者合并删除，而不是继续等它出现。
+- **验证**：29 个测试全过；真仓库复跑，`feat` 行显示 `gone` + 那句 note。

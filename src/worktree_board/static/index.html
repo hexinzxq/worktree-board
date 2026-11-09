@@ -123,6 +123,7 @@
     if ((tree.behind ?? 0) > 0) bits.push('<span class="badge behind">落后</span>');
     if (tree.prunable) bits.push('<span class="badge behind">已不存在</span>');
     if (tree.locked) bits.push('<span class="badge dirty">锁定</span>');
+    if (tree.upstream_gone) bits.push('<span class="badge behind">上游已删</span>');
     return bits.join("");
   }
 
@@ -152,7 +153,7 @@
       <tr class="${tree.main ? "main" : ""}">
         <td>${esc(tree.branch ?? "(detached " + tree.head + ")")}</td>
         <td>${stateOf(tree)}</td>
-        <td class="num">${tree.behind ?? "—"}</td>
+        <td class="num">${tree.upstream_gone ? "gone" : (tree.behind ?? "—")}</td>
         <td class="num">${tree.ahead ?? "—"}</td>
         <td><span class="subject">${esc(tree.subject || (tree.head ? "—" : "(还没有提交)"))}</span><br><span class="when">${esc((tree.committed_at || "").slice(0, 16).replace("T", " "))}</span></td>
         <td class="path">${esc(tree.path)}</td>

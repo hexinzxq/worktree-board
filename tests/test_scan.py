@@ -165,5 +165,54 @@ class FreshRepoScanTests(FreshRepoCase):
         self.assertNotIn("000000000000", out)
 
 
+class GoneUpstreamTests(RepoCase):
+    def test_a_branch_whose_upstream_was_deleted_says_so(self) -> None:
+        # push, delete on the remote, prune: the config still names an upstream
+        # that no longer exists, and "0 behind" would be a lie.
+        upstream = self.base / "upstream"
+        upstream.mkdir()
+        git("init", "-q", "--bare", cwd=upstream)
+        git("remote", "add", "origin", str(upstream), cwd=self.repo)
+        git("push", "-qu", "origin", "main", cwd=self.repo)
+        git("checkout", "-qb", "feature", cwd=self.repo)
+        (self.repo / "new.txt").write_text("x\n")
+        git("add", ".", cwd=self.repo)
+        git("commit", "-qm", "work", cwd=self.repo)
+        git("push", "-qu", "origin", "feature", cwd=self.repo)
+        git("push", "origin", "--delete", "feature", cwd=self.repo)
+        git("fetch", "--prune", "origin", cwd=self.repo)
+        tree = scan(self.repo)[0]
+        self.assertTrue(tree.upstream_gone)
+        self.assertIsNone(tree.behind)
+        self.assertIsNone(tree.ahead)
+
+
+class RepoRootErrorTests(FreshRepoCase):
+    """Three ways rev-parse says no, three sentences that say something."""
+
+    def test_a_plain_directory_is_not_a_repository(self) -> None:
+        from worktree_board.scan import GitError, repo_root
+        plain = Path(self.tmp.name) / "plain"
+        plain.mkdir()
+        with self.assertRaises(GitError) as caught:
+            repo_root(plain)
+        self.assertIn("is not inside a git repository", str(caught.exception))
+
+    def test_a_bare_repository_is_named_as_such(self) -> None:
+        from worktree_board.scan import GitError, repo_root
+        bare = Path(self.tmp.name) / "bare.git"
+        bare.mkdir()
+        git("init", "-q", "--bare", cwd=bare)
+        with self.assertRaises(GitError) as caught:
+            repo_root(bare)
+        self.assertIn("bare repository", str(caught.exception))
+
+    def test_the_git_directory_is_not_the_working_tree(self) -> None:
+        from worktree_board.scan import repo_root
+        with self.assertRaises(Exception) as caught:
+            repo_root(self.repo / ".git")
+        self.assertIn("git directory", str(caught.exception))
+
+
 if __name__ == "__main__":
     unittest.main()

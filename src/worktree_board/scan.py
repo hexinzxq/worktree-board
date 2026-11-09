@@ -45,14 +45,28 @@ class Worktree:
     subject: str  # last commit subject
     committed_at: str  # ISO 8601 of the last commit
     fetched_at: str  # ISO 8601 of the last fetch; "" when never fetched
+    upstream_gone: bool = False  # the tracked branch was deleted on the remote
 
     def as_json(self) -> dict:
         return asdict(self)
 
 
 def repo_root(path: Path) -> Path:
-    """The top level of the working tree that contains `path`."""
-    return Path(_must(["rev-parse", "--show-toplevel"], path).strip())
+    """The top level of the working tree that contains `path`.
+
+    `git rev-parse` answers this one of three ways, and the three deserve
+    different sentences: a worktree (fine), a bare repository (a real git
+    repository with nothing to show here), or no repository at all.
+    """
+    done = _git(["rev-parse", "--show-toplevel"], path)
+    if done.returncode == 0:
+        return Path(done.stdout.strip())
+    bare = _git(["rev-parse", "--is-bare-repository"], path)
+    if bare.returncode == 0 and bare.stdout.strip() == "true":
+        raise GitError(f"{path} is a bare repository — it has no worktrees to show")
+    if path.name == ".git":
+        raise GitError(f"{path} is a git directory, not a working tree — pass the repository root")
+    raise GitError(f"{path} is not inside a git repository")
 
 
 def _parse_list(porcelain: str) -> list[dict]:
@@ -92,23 +106,33 @@ def _dirty_count(path: Path) -> int:
     return len([line for line in out.stdout.splitlines() if line.strip()])
 
 
-def _ahead_behind(path: Path) -> tuple[int | None, int | None]:
-    """Commits ahead of / behind the upstream; (None, None) without one.
+def _ahead_behind(path: Path, branch: str | None = None) -> tuple[int | None, int | None, bool]:
+    """Commits ahead of / behind the upstream, and whether the upstream is gone.
 
     A worktree that has just been created for a branch with no upstream is a
     normal state, not an error — that is why this returns a pair of Nones
-    instead of raising.
+    instead of raising. A branch whose upstream *was* configured and is now
+    missing (deleted on the remote, before the next fetch) is a different
+    thing: that is worth a word, because "0 behind" is then a lie.
     """
     if not path.is_dir():
-        return None, None
+        return None, None, False
     out = _git(["rev-list", "--left-right", "--count", "@{upstream}...HEAD"], path)
     if out.returncode != 0:
-        return None, None
+        # No usable upstream. Either none was ever configured (fine), or one
+        # was and its remote-tracking ref is missing — after `fetch --prune`
+        # that means the branch was deleted on the remote.
+        if branch:
+            merge = _git(["config", "--get", f"branch.{branch}.merge"], path)
+            remote = _git(["config", "--get", f"branch.{branch}.remote"], path)
+            if merge.returncode == 0 and merge.stdout.strip() and remote.returncode == 0 and remote.stdout.strip():
+                return None, None, True
+        return None, None, False
     parts = out.stdout.split()
     if len(parts) != 2:
-        return None, None
+        return None, None, False
     behind, ahead = int(parts[0]), int(parts[1])
-    return ahead, behind
+    return ahead, behind, False
 
 
 def _fetched_at(path: Path) -> str:
@@ -150,7 +174,7 @@ def scan(repo: Path) -> list[Worktree]:
     out: list[Worktree] = []
     for index, entry in enumerate(listing):
         path = Path(entry["path"])
-        ahead, behind = _ahead_behind(path)
+        ahead, behind, upstream_gone = _ahead_behind(path, entry["branch"])
         subject, when = _last_commit(path)
         unborn = bool(entry["head"]) and set(entry["head"]) == {"0"}
         out.append(Worktree(
@@ -166,6 +190,7 @@ def scan(repo: Path) -> list[Worktree]:
             subject=subject or ("(no commits yet)" if unborn else ""),
             committed_at=when,
             fetched_at=_fetched_at(path),
+            upstream_gone=upstream_gone,
         ))
     return out
 
