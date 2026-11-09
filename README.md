@@ -53,6 +53,8 @@ wtree serve            # 打开 http://127.0.0.1:8765
 
 ## 待办
 
+- [ ] worktree ↔ 会话映射（为什么还没做：见 docs/DECISIONS.md）
+
 - [ ] 把 worktree 与会话（pid / 会话目录）对上，页面上标「活跃」
 - [ ] 给落后远程的 worktree 一键 `git fetch` 提示（仍然只读，只提示不执行）
 
