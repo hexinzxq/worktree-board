@@ -7,7 +7,7 @@ import unittest
 import urllib.error
 import urllib.request
 
-from worktree_board.server import serve
+from worktree_board.server import INDEX, serve
 
 from .test_scan import RepoCase, git  # noqa: F401  (RepoCase builds the fixture)
 
@@ -62,6 +62,16 @@ class ServerTests(RepoCase):
         tree = json.loads(body)["worktrees"][0]
         self.assertIsNone(tree["ahead"])
         self.assertIsNone(tree["behind"])
+
+
+class PageTests(unittest.TestCase):
+    def test_the_page_carries_the_freshness_caveat(self) -> None:
+        # The table explains that `behind` is measured against the last fetch;
+        # the page has to say the same thing or the two outputs disagree.
+        html = INDEX.read_text(encoding="utf-8")
+        self.assertIn("fetched_at", html)
+        self.assertIn("最后一次 fetch", html)
+        self.assertIn('id="fresh"', html)
 
 
 if __name__ == "__main__":

@@ -74,6 +74,7 @@
   .focusable:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .empty { padding: 18px 16px; color: var(--muted); }
   footer { padding: 0 24px 28px; color: var(--muted); font-size: 13px; }
+  .note { margin: 10px 24px 0; color: var(--muted); font-size: 13px; }
   @media (max-width: 720px) {
     main { padding: 16px; }
     th:nth-child(4), td:nth-child(4), th:nth-child(5), td:nth-child(5) { display: none; }
@@ -88,6 +89,7 @@
 </header>
 <main>
   <div class="totals" id="totals"></div>
+  <p id="fresh" class="note" hidden></p>
   <section class="board" aria-label="worktrees">
     <table>
       <caption>一个 worktree = 一个会话。读的是 git 自己的状态，只读。</caption>
@@ -133,6 +135,15 @@
       `<span class="chip"><b>${t.behind}</b> 个落后远程</span>`,
       `<span class="chip"><b>${t.prunable}</b> 个已不存在</span>`,
     ].join("");
+    const fresh = document.getElementById("fresh");
+    const newest = data.worktrees.map((tree) => tree.fetched_at).filter(Boolean).sort().pop();
+    if (t.behind > 0) {
+      const when = newest ? newest.slice(0, 16).replace("T", " ") : "还没 fetch 过";
+      fresh.textContent = `落后数是对着最后一次 fetch 的引用算的（${when}）；要更准，在对应的 worktree 里 git fetch 一次。`;
+      fresh.hidden = false;
+    } else {
+      fresh.hidden = true;
+    }
     if (!data.worktrees.length) {
       rows.innerHTML = '<tr><td colspan="6" class="empty">这个仓库还没有 worktree。</td></tr>';
       return;
