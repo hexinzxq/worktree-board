@@ -41,3 +41,9 @@
 - **改了什么**：`scan()` 新增 `fetched_at`——读 `git rev-parse --git-common-dir` 下 `FETCH_HEAD` 的 mtime，转成 ISO 时间；`_table()` 在 `behind > 0` 时补一行 `note: behind is measured against the last fetch (…newest…) — run git fetch for a fresher number`；README 字段表补上这个字段。新增 2 个用例（推一次再 fetch 后 behind 是 1 且 `fetched_at` 非空、表格出现那句 note）。
 - **为什么**：`@{upstream}` 比的是本地引用。三天没 fetch 的克隆上「落后 0」是句真话，但说的是三天前的快照——看板给数字不给新鲜度，等于让人拿旧地图找路。这一条和第 2 条是同一个毛病：数字本身对，读者理解错。
 - **验证**：21 个测试全过（upstream 用裸仓库 + 另一个克隆推一次来造「落后 1」的真实局面）。推送仍受网络影响，见当天收口汇报。
+
+### #6 中文提交主题把表格推歪了
+
+- **改了什么**：`cli.py` 的表格改成按「终端格子」排版——新增 `_width()`（`unicodedata.east_asian_width` 里 `W`/`F` 记 2 格）与 `_pad()`，`_cell()` 截断也改按格子算（中文就不至于截出半个字）。新增 2 个用例：中文目录 + 中文提交的仓库，所有行的 PATH 必须从同一列开始；20 格的预算里截「修复看板里中文提交主题的对齐问题」必须以 `…` 结尾且宽度 ≤ 20。
+- **为什么**：这台机器上提交主题和目录名本来就常是中文。`len()` 把「修」当 1 格，`ljust` 就少补一格，PATH 一列整排右移——今天用 `中文 仓库` + 中文提交主题真跑了一遍，LAST COMMIT 和 PATH 两列肉眼可见地歪。表格是这个工具唯一的输出，歪了就等于没对齐。
+- **验证**：23 个测试全过；同一场景复跑，两行 PATH 起点对齐。

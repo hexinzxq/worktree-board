@@ -9,14 +9,34 @@ import argparse
 import json
 import sys
 import time
+import unicodedata
 from pathlib import Path
 
 from .scan import GitError, report
 from .server import serve
 
 
+def _width(text: str) -> int:
+    """Terminal cells a string occupies — CJK characters take two, not one."""
+    return sum(2 if unicodedata.east_asian_width(ch) in ("W", "F") else 1 for ch in text)
+
+
 def _cell(text: str, width: int) -> str:
-    return text if len(text) <= width else text[: max(width - 1, 1)] + "…"
+    """Cut a string to at most `width` terminal cells, keeping the ellipsis."""
+    if _width(text) <= width:
+        return text
+    out, used = [], 0
+    for ch in text:
+        step = _width(ch)
+        if used + step > max(width - 1, 1):
+            break
+        out.append(ch)
+        used += step
+    return "".join(out) + "…"
+
+
+def _pad(text: str, width: int) -> str:
+    return text + " " * max(width - _width(text), 0)
 
 
 def _table(data: dict) -> str:
@@ -39,10 +59,10 @@ def _table(data: dict) -> str:
             _cell(tree["subject"], widths[4]),
             tree["path"],
         ))
-    table = ["  ".join(f"{header[i]:<{widths[i]}}" if widths[i] else header[i]
+    table = ["  ".join(_pad(header[i], widths[i]) if widths[i] else header[i]
                        for i in range(len(header)))]
     for row in rows:
-        table.append("  ".join(f"{cell:<{widths[i]}}" if widths[i] else cell
+        table.append("  ".join(_pad(cell, widths[i]) if widths[i] else cell
                                for i, cell in enumerate(row)))
     totals = data["totals"]
     table.append("")

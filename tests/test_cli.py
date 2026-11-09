@@ -9,6 +9,7 @@ import shutil
 import socket
 import subprocess
 import sys
+import tempfile
 import time
 import unittest
 from pathlib import Path
@@ -25,6 +26,43 @@ def run(*argv: str) -> tuple[int, str]:
     with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
         code = main(list(argv))
     return code, out.getvalue() + err.getvalue()
+
+
+class WideTextTests(unittest.TestCase):
+    """CJK counts as two cells; a table that pads by len() leans right of the header."""
+
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.repo = Path(self.tmp.name) / "中文 仓库"
+        self.repo.mkdir()
+        git("init", "-q", "-b", "main", cwd=self.repo)
+        git("config", "user.email", "a@b.c", cwd=self.repo)
+        git("config", "user.name", "a", cwd=self.repo)
+        (self.repo / "a.txt").write_text("x")
+        git("add", ".", cwd=self.repo)
+        git("commit", "-qm", "修复看板里中文提交主题的对齐问题，别让表格歪", cwd=self.repo)
+        git("worktree", "add", "-q", "../另一个 worktree", "-b", "feature", cwd=self.repo)
+
+    def tearDown(self) -> None:
+        self.tmp.cleanup()
+
+    def test_every_row_starts_its_path_at_the_same_cell(self) -> None:
+        from worktree_board.cli import _table, _width
+        from worktree_board.scan import report
+        out = _table(report(self.repo))
+        starts = set()
+        for line in out.splitlines():
+            if "  /private/" not in line and "  /var/" not in line and "  /tmp/" not in line:
+                continue
+            prefix = line[: line.index("  /") + 2]
+            starts.add(_width(prefix))
+        self.assertEqual(len(starts), 1, f"path column drifts: {starts}")
+
+    def test_cutting_a_wide_subject_keeps_the_cell_budget(self) -> None:
+        from worktree_board.cli import _cell, _width
+        cut = _cell("修复看板里中文提交主题的对齐问题，别让表格歪", 20)
+        self.assertTrue(cut.endswith("…"))
+        self.assertLessEqual(_width(cut), 20)
 
 
 class LsTests(RepoCase):
