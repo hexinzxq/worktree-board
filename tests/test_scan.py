@@ -199,14 +199,33 @@ class RepoRootErrorTests(FreshRepoCase):
             repo_root(plain)
         self.assertIn("is not inside a git repository", str(caught.exception))
 
-    def test_a_bare_repository_is_named_as_such(self) -> None:
-        from worktree_board.scan import GitError, repo_root
+    def test_a_bare_repository_is_a_repository_not_an_error(self) -> None:
+        from worktree_board.scan import repo_root
         bare = Path(self.tmp.name) / "bare.git"
         bare.mkdir()
         git("init", "-q", "--bare", cwd=bare)
-        with self.assertRaises(GitError) as caught:
-            repo_root(bare)
-        self.assertIn("bare repository", str(caught.exception))
+        self.assertEqual(repo_root(bare).resolve(), bare.resolve())
+
+    def test_a_bare_repository_can_own_worktrees(self) -> None:
+        # `git worktree add` works from a bare repo, and the board has to show
+        # the linked checkout without calling the bare entry "main".
+        bare = Path(self.tmp.name) / "hosting.git"
+        bare.mkdir()
+        git("init", "-q", "--bare", cwd=bare)
+        git("config", "user.email", "t@example.com", cwd=self.repo)
+        git("config", "user.name", "t", cwd=self.repo)
+        (self.repo / "a.txt").write_text("x\n")
+        git("add", ".", cwd=self.repo)
+        git("commit", "-qm", "one", cwd=self.repo)
+        git("push", "-q", str(bare), "main", cwd=self.repo)
+        checkout = Path(self.tmp.name) / "site"
+        git("worktree", "add", "-q", str(checkout), "main", cwd=bare)
+        trees = scan(bare)
+        self.assertEqual(len(trees), 2)
+        self.assertTrue(trees[0].bare)
+        self.assertFalse(trees[0].main)
+        self.assertFalse(trees[1].bare)
+        self.assertEqual(trees[1].branch, "main")
 
     def test_the_git_directory_is_not_the_working_tree(self) -> None:
         from worktree_board.scan import repo_root

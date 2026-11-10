@@ -77,3 +77,9 @@
 - **改了什么**：`report()["totals"]` 加 `upstream_gone`；表格汇总行在有上游已删时补 `, 1 upstream gone`；网页统计条多一个「N 个上游已删」chip。测试补两处断言（totals 与行一致、汇总文案出现）。
 - **为什么**：第 9 条让 BEHIND 格写 `gone`，但汇总行还是 `0 behind upstream`——同一张表里两个数字互相否认。汇总行是很多人唯一会读的一行，它得和明细一致。
 - **验证**：32 个测试全过；真仓库复跑，汇总行 `1 worktree(s), 0 dirty, 0 behind upstream, 1 upstream gone`。
+
+### #12 裸仓库也能有自己的 worktree，别一口回绝
+
+- **改了什么**：`repo_root()` 遇到裸仓库不再抛错——`git worktree list` 在裸仓库里本来就能用，返回 `--absolute-git-dir` 作为根；`_parse_list` 认识 `bare` 那一行；`Worktree` 加 `bare` 字段，表格第一列写 `(bare repository)`、页面对应徽章「裸仓库」，并且裸条目不再被当成主工作树。原用例改成「裸仓库是仓库不是错误」，另加一个「裸仓库 + `worktree add` 出来的检出，两行都不错」。
+- **为什么**：上一轮（`d518379`）我自己写的那句「裸仓库没有 worktree 可看」是错的。`git worktree add` 完全可以在裸仓库里执行，托管用裸仓库 + 检出放别处是很正常的布局。错误消息写得斩钉截铁，比不说还糟。
+- **验证**：33 个测试全过；真造了一个裸仓库 + 一个检出，表格两行：`(bare repository)`（不标主）和 `main`。

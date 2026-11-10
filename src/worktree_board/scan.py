@@ -46,24 +46,27 @@ class Worktree:
     committed_at: str  # ISO 8601 of the last commit
     fetched_at: str  # ISO 8601 of the last fetch; "" when never fetched
     upstream_gone: bool = False  # the tracked branch was deleted on the remote
+    bare: bool = False  # this entry is the bare repository itself, not a checkout
 
     def as_json(self) -> dict:
         return asdict(self)
 
 
 def repo_root(path: Path) -> Path:
-    """The top level of the working tree that contains `path`.
+    """The repository that contains `path`: a working tree or a bare repo.
 
-    `git rev-parse` answers this one of three ways, and the three deserve
-    different sentences: a worktree (fine), a bare repository (a real git
-    repository with nothing to show here), or no repository at all.
+    A bare repository is a perfectly good answer — it can own worktrees even
+    though it has none itself, and `git worktree list` works inside it. Only
+    "not a repository at all" is an error, and its two flavours (a plain
+    directory, a `.git` directory) get their own sentences.
     """
     done = _git(["rev-parse", "--show-toplevel"], path)
     if done.returncode == 0:
         return Path(done.stdout.strip())
     bare = _git(["rev-parse", "--is-bare-repository"], path)
     if bare.returncode == 0 and bare.stdout.strip() == "true":
-        raise GitError(f"{path} is a bare repository — it has no worktrees to show")
+        git_dir = _git(["rev-parse", "--absolute-git-dir"], path)
+        return Path(git_dir.stdout.strip()) if git_dir.returncode == 0 else path
     if path.name == ".git":
         raise GitError(f"{path} is a git directory, not a working tree — pass the repository root")
     raise GitError(f"{path} is not inside a git repository")
@@ -77,7 +80,8 @@ def _parse_list(porcelain: str) -> list[dict]:
             if current is not None:
                 entries.append(current)
             current = {"path": line[len("worktree "):], "branch": None,
-                       "head": "", "main": False, "locked": False, "prunable": False}
+                       "head": "", "main": False, "locked": False, "prunable": False,
+                       "bare": False}
         elif current is None:
             continue
         elif line.startswith("HEAD "):
@@ -89,6 +93,8 @@ def _parse_list(porcelain: str) -> list[dict]:
             current["branch"] = None
         elif line.startswith("locked"):
             current["locked"] = True
+        elif line == "bare":
+            current["bare"] = True
         elif line.startswith("prunable"):
             current["prunable"] = True
     if current is not None:
@@ -181,7 +187,7 @@ def scan(repo: Path) -> list[Worktree]:
             path=str(path),
             branch=entry["branch"],
             head="" if unborn else entry["head"][:12],
-            main=index == 0,
+            main=index == 0 and not entry.get("bare"),
             locked=entry["locked"],
             prunable=entry["prunable"],
             dirty=_dirty_count(path),
@@ -191,6 +197,7 @@ def scan(repo: Path) -> list[Worktree]:
             committed_at=when,
             fetched_at=_fetched_at(path),
             upstream_gone=upstream_gone,
+            bare=entry.get("bare", False),
         ))
     return out
 
