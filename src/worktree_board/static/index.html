@@ -153,7 +153,7 @@
     }
     rows.innerHTML = data.worktrees.map((tree) => `
       <tr class="${tree.main ? "main" : ""}">
-        <td>${esc(tree.branch ?? (tree.bare ? "(bare repository)" : "(detached " + tree.head + ")"))}</td>
+        <td>${esc(tree.branch ?? (tree.bare ? "(bare repository)" : "(detached " + (tree.head || "").slice(0, 7) + ")"))}</td>
         <td>${stateOf(tree)}</td>
         <td class="num">${tree.upstream_gone ? "gone" : (tree.behind ?? "—")}</td>
         <td class="num">${tree.ahead ?? "—"}</td>

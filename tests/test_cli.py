@@ -28,6 +28,22 @@ def run(*argv: str) -> tuple[int, str]:
     return code, out.getvalue() + err.getvalue()
 
 
+class DetachedRowTests(unittest.TestCase):
+    def test_a_detached_worktree_shows_a_short_sha(self) -> None:
+        from worktree_board.cli import _table
+        sha = "2913c94ed0ae9c7bf700b1331449c81ec6c5404a"
+        out = _table({
+            "root": "/tmp/r",
+            "totals": {"count": 1, "dirty": 0, "behind": 0},
+            "worktrees": [{"branch": None, "main": False, "head": sha, "dirty": 0,
+                           "ahead": None, "behind": None, "subject": "one", "path": "/tmp/wt",
+                           "committed_at": "2026-11-10T00:00:00+00:00",
+                           "prunable": False, "locked": False}],
+        })
+        self.assertIn("(detached 2913c94)", out)
+        self.assertNotIn(sha, out)
+
+
 class AgeTests(unittest.TestCase):
     def test_age_units(self) -> None:
         from datetime import datetime, timedelta, timezone

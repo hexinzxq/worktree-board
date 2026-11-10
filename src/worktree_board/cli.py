@@ -85,7 +85,7 @@ def _table(data: dict) -> str:
     header = ("BRANCH", "DIRTY", "AHEAD", "BEHIND", "LAST COMMIT", "AGE", "PATH")
     widths = (28, 5, 5, 6, 46, 8, 0)
     for tree in data["worktrees"]:
-        branch = tree["branch"] or ("(bare repository)" if tree.get("bare") else f"(detached {tree['head']})")
+        branch = tree["branch"] or ("(bare repository)" if tree.get("bare") else f"(detached {tree['head'][:7]})")
         if tree["main"]:  # a bare entry is never the main worktree
             branch += " *"
         if tree["prunable"]:

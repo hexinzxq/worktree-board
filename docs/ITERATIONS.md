@@ -89,3 +89,9 @@
 - **改了什么**：`wtree ls` 加一列 `AGE`（`2d` / `3h` / `5m` / `just now`），从 `committed_at` 算，`--json` 不变；新加 2 个用例（单位换算与不可解析时间的 `?`，表格里确实出现 AGE 列）。
 - **为什么**：看板是拿来判断「这条 worktree 是不是死了」的。北京时间 2026-11-10 复跑 skillforge 那行，LAST COMMIT 只写 `read tokens from a pag…`，看不出这是两天前还是两分钟前的提交；网页那边本来就有完整时间戳，CLI 反而缺。一个日期挤成 `2d` 才是一眼能扫的量。
 - **验证**：35 个测试全过；对 `/Users/xin/Documents/deepseek-harness/default-workspace/skillforge` 实跑，`AGE` 列显示 `2d`，与 git log 时间吻合。
+
+### #14 分离头指针那一行把 40 位 sha 全印出来
+
+- **改了什么**：detached worktree 的分支列从 `(detached <40 位 sha>)` 改成 `(detached 2913c94)`（7 位），网页同一处一起改；新加 1 个用例（表格里出现短 sha、整串 sha 不在输出里）。
+- **为什么**：真造了个 `--detach` 的 worktree 才看见——28 列的分支格被撑到 52 个字符，网页那一格直接把整行顶宽。要认那条提交，7 位足够 `git show`，40 位只配出现在 `--json` 里。
+- **验证**：36 个测试全过；同一个分离头指针场景复跑，分支列回到 `(detached 2913c94)`，表格其余列不再被推歪。
