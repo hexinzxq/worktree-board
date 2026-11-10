@@ -83,3 +83,9 @@
 - **改了什么**：`repo_root()` 遇到裸仓库不再抛错——`git worktree list` 在裸仓库里本来就能用，返回 `--absolute-git-dir` 作为根；`_parse_list` 认识 `bare` 那一行；`Worktree` 加 `bare` 字段，表格第一列写 `(bare repository)`、页面对应徽章「裸仓库」，并且裸条目不再被当成主工作树。原用例改成「裸仓库是仓库不是错误」，另加一个「裸仓库 + `worktree add` 出来的检出，两行都不错」。
 - **为什么**：上一轮（`d518379`）我自己写的那句「裸仓库没有 worktree 可看」是错的。`git worktree add` 完全可以在裸仓库里执行，托管用裸仓库 + 检出放别处是很正常的布局。错误消息写得斩钉截铁，比不说还糟。
 - **验证**：33 个测试全过；真造了一个裸仓库 + 一个检出，表格两行：`(bare repository)`（不标主）和 `main`。
+
+### #13 表格只说「最后一次提交」，不说多久以前
+
+- **改了什么**：`wtree ls` 加一列 `AGE`（`2d` / `3h` / `5m` / `just now`），从 `committed_at` 算，`--json` 不变；新加 2 个用例（单位换算与不可解析时间的 `?`，表格里确实出现 AGE 列）。
+- **为什么**：看板是拿来判断「这条 worktree 是不是死了」的。北京时间 2026-11-10 复跑 skillforge 那行，LAST COMMIT 只写 `read tokens from a pag…`，看不出这是两天前还是两分钟前的提交；网页那边本来就有完整时间戳，CLI 反而缺。一个日期挤成 `2d` 才是一眼能扫的量。
+- **验证**：35 个测试全过；对 `/Users/xin/Documents/deepseek-harness/default-workspace/skillforge` 实跑，`AGE` 列显示 `2d`，与 git log 时间吻合。

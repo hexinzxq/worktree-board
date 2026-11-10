@@ -10,6 +10,7 @@ import json
 import sys
 import time
 import unicodedata
+from datetime import datetime, timezone
 from pathlib import Path
 
 from .scan import GitError, report
@@ -51,6 +52,23 @@ def _cell(text: str, width: int, keep_tail: bool = False) -> str:
     return _cut(text, head) + "…" + _cut(text, tail, from_start=False)
 
 
+def _age(iso: str, now: datetime | None = None) -> str:
+    """How long ago a commit landed, in the units a glance needs."""
+    try:
+        stamp = datetime.fromisoformat(iso)
+    except ValueError:
+        return "?"
+    if stamp.tzinfo is None:
+        stamp = stamp.replace(tzinfo=timezone.utc)
+    seconds = ((now or datetime.now(timezone.utc)) - stamp).total_seconds()
+    if seconds < 90:
+        return "just now"
+    for size, unit in ((86400, "d"), (3600, "h"), (60, "m")):
+        if seconds >= size:
+            return f"{int(seconds // size)}{unit}"
+    return "just now"
+
+
 def _short_path(path: str, home: Path | None = None) -> str:
     """`~` instead of the home prefix: four columns saved on every row."""
     home = home or Path.home()
@@ -64,8 +82,8 @@ def _pad(text: str, width: int) -> str:
 
 def _table(data: dict) -> str:
     rows = []
-    header = ("BRANCH", "DIRTY", "AHEAD", "BEHIND", "LAST COMMIT", "PATH")
-    widths = (28, 5, 5, 6, 46, 0)
+    header = ("BRANCH", "DIRTY", "AHEAD", "BEHIND", "LAST COMMIT", "AGE", "PATH")
+    widths = (28, 5, 5, 6, 46, 8, 0)
     for tree in data["worktrees"]:
         branch = tree["branch"] or ("(bare repository)" if tree.get("bare") else f"(detached {tree['head']})")
         if tree["main"]:  # a bare entry is never the main worktree
@@ -80,6 +98,7 @@ def _table(data: dict) -> str:
             "-" if tree["ahead"] is None else str(tree["ahead"]),
             "gone" if tree.get("upstream_gone") else ("-" if tree["behind"] is None else str(tree["behind"])),
             _cell(tree["subject"], widths[4]),
+            _age(tree["committed_at"]),
             _short_path(tree["path"]),
         ))
     table = ["  ".join(_pad(header[i], widths[i]) if widths[i] else header[i]

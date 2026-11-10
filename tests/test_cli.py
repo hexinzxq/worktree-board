@@ -28,6 +28,32 @@ def run(*argv: str) -> tuple[int, str]:
     return code, out.getvalue() + err.getvalue()
 
 
+class AgeTests(unittest.TestCase):
+    def test_age_units(self) -> None:
+        from datetime import datetime, timedelta, timezone
+        from worktree_board.cli import _age
+        now = datetime(2026, 11, 10, 12, 0, tzinfo=timezone.utc)
+        iso = lambda **kw: (now - timedelta(**kw)).isoformat()
+        self.assertEqual(_age(iso(seconds=10), now), "just now")
+        self.assertEqual(_age(iso(minutes=5), now), "5m")
+        self.assertEqual(_age(iso(hours=3), now), "3h")
+        self.assertEqual(_age(iso(days=2), now), "2d")
+        self.assertEqual(_age("", now), "?")
+
+    def test_the_table_says_how_old_each_commit_is(self) -> None:
+        from worktree_board.cli import _table
+        out = _table({
+            "root": "/tmp/r",
+            "totals": {"count": 1, "dirty": 0, "behind": 0},
+            "worktrees": [{"branch": "main", "main": True, "head": "abc", "dirty": 0,
+                           "ahead": 0, "behind": 0, "subject": "one", "path": "/tmp/r",
+                           "committed_at": "2020-01-01T00:00:00+00:00",
+                           "prunable": False, "locked": False}],
+        })
+        self.assertIn("AGE", out)
+        self.assertRegex(out, r"\b(\d+[dh]|just now)\b")
+
+
 class BranchNameTests(unittest.TestCase):
     def test_two_long_branches_still_look_different(self) -> None:
         # Session branches share the date prefix and differ at the end; cutting
