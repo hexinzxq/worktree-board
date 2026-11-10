@@ -21,18 +21,41 @@ def _width(text: str) -> int:
     return sum(2 if unicodedata.east_asian_width(ch) in ("W", "F") else 1 for ch in text)
 
 
-def _cell(text: str, width: int) -> str:
-    """Cut a string to at most `width` terminal cells, keeping the ellipsis."""
-    if _width(text) <= width:
-        return text
+def _cut(text: str, cells: int, from_start: bool = True) -> str:
+    """As many characters as fit in `cells`, from one end or the other."""
+    chars = text if from_start else reversed(text)
     out, used = [], 0
-    for ch in text:
+    for ch in chars:
         step = _width(ch)
-        if used + step > max(width - 1, 1):
+        if used + step > cells:
             break
         out.append(ch)
         used += step
-    return "".join(out) + "…"
+    return "".join(out) if from_start else "".join(reversed(out))
+
+
+def _cell(text: str, width: int, keep_tail: bool = False) -> str:
+    """Cut a string to at most `width` terminal cells, keeping the ellipsis.
+
+    Branch names share long prefixes (`claude/session-2026-11-10-…`) and differ
+    at the end, so cutting them from the right hides the only part that tells
+    two rows apart. Those keep both ends.
+    """
+    if _width(text) <= width:
+        return text
+    room = max(width - 1, 1)  # one cell for the ellipsis
+    if not keep_tail:
+        return _cut(text, room) + "…"
+    head = room * 3 // 5
+    tail = room - head
+    return _cut(text, head) + "…" + _cut(text, tail, from_start=False)
+
+
+def _short_path(path: str, home: Path | None = None) -> str:
+    """`~` instead of the home prefix: four columns saved on every row."""
+    home = home or Path.home()
+    prefix = str(home).rstrip("/") + "/"
+    return "~/" + path[len(prefix):] if path.startswith(prefix) else path
 
 
 def _pad(text: str, width: int) -> str:
@@ -52,12 +75,12 @@ def _table(data: dict) -> str:
         if tree["locked"]:
             branch += " (locked)"
         rows.append((
-            _cell(branch, widths[0]),
+            _cell(branch, widths[0], keep_tail=True),
             "-" if tree["dirty"] < 0 else str(tree["dirty"]),
             "-" if tree["ahead"] is None else str(tree["ahead"]),
             "gone" if tree.get("upstream_gone") else ("-" if tree["behind"] is None else str(tree["behind"])),
             _cell(tree["subject"], widths[4]),
-            tree["path"],
+            _short_path(tree["path"]),
         ))
     table = ["  ".join(_pad(header[i], widths[i]) if widths[i] else header[i]
                        for i in range(len(header)))]

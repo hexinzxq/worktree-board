@@ -28,6 +28,28 @@ def run(*argv: str) -> tuple[int, str]:
     return code, out.getvalue() + err.getvalue()
 
 
+class BranchNameTests(unittest.TestCase):
+    def test_two_long_branches_still_look_different(self) -> None:
+        # Session branches share the date prefix and differ at the end; cutting
+        # them from the right made two rows identical.
+        from worktree_board.cli import _cell
+        a = _cell("claude/session-2026-11-10-review-fix-flaky-test", 28, keep_tail=True)
+        b = _cell("claude/session-2026-11-10-review-fix-docs", 28, keep_tail=True)
+        self.assertNotEqual(a, b)
+        self.assertTrue(a.endswith("flaky-test"))
+        self.assertTrue(a.startswith("claude/"))
+
+    def test_a_short_branch_is_left_alone(self) -> None:
+        from worktree_board.cli import _cell
+        self.assertEqual(_cell("main", 28, keep_tail=True), "main")
+
+    def test_the_home_prefix_collapses_to_a_tilde(self) -> None:
+        from pathlib import Path as P
+        from worktree_board.cli import _short_path
+        self.assertEqual(_short_path("/Users/x/proj/a", home=P("/Users/x")), "~/proj/a")
+        self.assertEqual(_short_path("/tmp/x", home=P("/Users/x")), "/tmp/x")
+
+
 class WideTextTests(unittest.TestCase):
     """CJK counts as two cells; a table that pads by len() leans right of the header."""
 
