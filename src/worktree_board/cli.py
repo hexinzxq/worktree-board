@@ -89,8 +89,10 @@ def _table(data: dict) -> str:
                                for i, cell in enumerate(row)))
     totals = data["totals"]
     table.append("")
+    gone = totals.get("upstream_gone", 0)
     table.append(f"{totals['count']} worktree(s), {totals['dirty']} dirty, "
-                 f"{totals['behind']} behind upstream   ({data['root']})")
+                 f"{totals['behind']} behind upstream"
+                 f"{f', {gone} upstream gone' if gone else ''}   ({_short_path(data['root'])})")
     if totals["behind"]:
         newest = max((tree["fetched_at"] for tree in data["worktrees"] if tree["fetched_at"]), default="")
         since = f" (newest fetch {newest[:16].replace('T', ' ')})" if newest else ""

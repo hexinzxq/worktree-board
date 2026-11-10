@@ -185,6 +185,7 @@ class GoneUpstreamTests(RepoCase):
         self.assertTrue(tree.upstream_gone)
         self.assertIsNone(tree.behind)
         self.assertIsNone(tree.ahead)
+        self.assertEqual(report(self.repo)["totals"]["upstream_gone"], 1)
 
 
 class RepoRootErrorTests(FreshRepoCase):

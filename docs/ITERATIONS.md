@@ -71,3 +71,9 @@
 - **改了什么**：`_cell()` 加了 `keep_tail`——分支名超宽时保留头尾两端（`claude/session-2…-flaky-test`），提交主题仍按左侧截断。路径列把家目录前缀缩成 `~`（只影响显示，JSON 里还是绝对路径）。新增 3 个用例（两条只差尾部长分支必须显示不同、短分支不动、`_short_path` 有 home/无 home 两种）。
 - **为什么**：agent 开出来的分支名都长成 `claude/session-2026-11-10-<主题>`，前 28 列完全一样。原来从右边截，两行表格长得一模一样，唯一的区别在省略号后面——那等于没说。原样跑了两条 `review-fix-flaky-test` / `review-fix-docs`，肉眼确认修好了。
 - **验证**：32 个测试全过；同一场景复跑，两行尾部能分开。
+
+### #11 汇总行说「0 落后」，可那一行写着 gone
+
+- **改了什么**：`report()["totals"]` 加 `upstream_gone`；表格汇总行在有上游已删时补 `, 1 upstream gone`；网页统计条多一个「N 个上游已删」chip。测试补两处断言（totals 与行一致、汇总文案出现）。
+- **为什么**：第 9 条让 BEHIND 格写 `gone`，但汇总行还是 `0 behind upstream`——同一张表里两个数字互相否认。汇总行是很多人唯一会读的一行，它得和明细一致。
+- **验证**：32 个测试全过；真仓库复跑，汇总行 `1 worktree(s), 0 dirty, 0 behind upstream, 1 upstream gone`。

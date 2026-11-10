@@ -135,6 +135,7 @@
       `<span class="chip"><b>${t.dirty}</b> 个有未提交改动</span>`,
       `<span class="chip"><b>${t.behind}</b> 个落后远程</span>`,
       `<span class="chip"><b>${t.prunable}</b> 个已不存在</span>`,
+      ...(t.upstream_gone ? [`<span class="chip"><b>${t.upstream_gone}</b> 个上游已删</span>`] : []),
     ].join("");
     const fresh = document.getElementById("fresh");
     const newest = data.worktrees.map((tree) => tree.fetched_at).filter(Boolean).sort().pop();

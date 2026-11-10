@@ -207,5 +207,6 @@ def report(repo: Path) -> dict:
             "behind": sum(1 for tree in trees if (tree.behind or 0) > 0),
             "prunable": sum(1 for tree in trees if tree.prunable),
             "locked": sum(1 for tree in trees if tree.locked),
+            "upstream_gone": sum(1 for tree in trees if tree.upstream_gone),
         },
     }

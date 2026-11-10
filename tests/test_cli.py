@@ -157,6 +157,7 @@ class LsTests(RepoCase):
         self.assertEqual(code, 0)
         self.assertIn("gone", out)
         self.assertIn("upstream branch missing", out)
+        self.assertIn("1 upstream gone", out)  # the totals line must agree with the row
 
     def test_a_busy_port_is_a_message_not_a_traceback(self) -> None:
         # A dev server already running on 8765 is the normal way to meet this.
