@@ -102,6 +102,38 @@ def _parse_list(porcelain: str) -> list[dict]:
     return entries
 
 
+def find_repos(base: Path, min_worktrees: int = 2, max_depth: int = 6) -> list[dict]:
+    """Walk `base` for repositories that have at least `min_worktrees` worktrees.
+
+    A checkout is a directory with a `.git` entry (a directory, or the file a
+    linked worktree carries). Found checkouts are not descended into: their
+    submodules and vendored copies belong to them, not to the survey.
+    """
+    import os
+
+    found: list[dict] = []
+    base = base.resolve()
+    for current, dirs, files in os.walk(base):
+        here = Path(current)
+        depth = len(here.relative_to(base).parts)
+        if depth >= max_depth:
+            dirs[:] = []
+        if ".git" in files:
+            dirs[:] = []  # a linked worktree: its owner repo reports it
+            continue
+        if ".git" in dirs:
+            dirs[:] = []  # the checkout owns its own tree
+            try:
+                root = repo_root(here)
+            except GitError:
+                continue
+            count = len(scan(root))
+            if count >= min_worktrees:
+                found.append({"root": str(root), "count": count})
+    found.sort(key=lambda item: (-item["count"], item["root"]))
+    return found
+
+
 def _dirty_count(path: Path) -> int:
     """Count changed and untracked entries; a missing directory counts as all-dirty."""
     if not path.is_dir():

@@ -107,3 +107,10 @@
 - **改了什么**：新增 `tests/test_packaging.py` 四个检查——`package-data` 里有 `static/*.html`、被承诺的页面文件真的存在、`wtree` 入口指向 `worktree_board.cli:main`、仓库里没有跟踪任何 `.pyc`。Python 3.10 没有 `tomllib`，那两条自动 skip。
 - **为什么**：昨天那条「缺页面就断连」是治标。真正的问题是本机没有 setuptools（`pip install --no-build-isolation .` 直接报 `BackendUnavailable`），安装路径只能靠 CI 验证，而 CI 推不上去。把「页面必须进包」写成测试，至少下次改 `pyproject.toml` 时有人接住。
 - **验证**：41 个测试全过。
+
+### #17 加 `wtree find`：先找到 worktree 在哪
+
+- **改了什么**：新子命令 `wtree find -C <目录>`，从目录往下走（最多 6 层）找带 `.git` 的检出，只列出 worktree 数 ≥ `--min`（默认 2）的仓库；`--json` 给 `{root, repos[]}`；找到仓库就不再往里走。`scan.find_repos()` 负责这件事。新增 2 个用例（只报 ≥2 的仓库、排序与计数对；走进仓库内部不再重复计数）。
+- **为什么**：跑 `find -C ~/Documents -type d -name worktrees` 得到**零结果**——这台机器上一个仓库都没开过 linked worktree，看板的表至今只在测试夹具和自建 demo 上跑过。既然「worktree 在哪」是第一步，就先给个步骤。顺带在真目录上验证：`no repository with 2+ worktree(s) under ~/Documents/deepseek-harness/default-workspace`，是实话。
+- **坑**：第一版把 linked worktree 当成独立仓库（它的 `.git` 是个文件）→ 同一个仓库报两遍。改成 `.git` 是文件就跳过（归属仓库会报它），`.git` 是目录才算检出。
+- **验证**：43 个测试全过；真目录实跑输出上面那句。

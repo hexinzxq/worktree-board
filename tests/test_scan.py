@@ -188,6 +188,36 @@ class GoneUpstreamTests(RepoCase):
         self.assertEqual(report(self.repo)["totals"]["upstream_gone"], 1)
 
 
+class FindReposTests(RepoCase):
+    def test_only_repositories_with_two_worktrees_are_reported(self) -> None:
+        from worktree_board.scan import find_repos
+        git("worktree", "add", "-q", str(self.base / "wt"), "-b", "feat", cwd=self.repo)
+        lonely = self.base / "lonely"
+        lonely.mkdir()
+        git("init", "-q", "-b", "main", cwd=lonely)
+        git("config", "user.email", "t@example.com", cwd=lonely)
+        git("config", "user.name", "t", cwd=lonely)
+        (lonely / "a").write_text("x")
+        git("add", ".", cwd=lonely)
+        git("commit", "-qm", "one", cwd=lonely)
+
+        found = find_repos(self.base)
+        self.assertEqual([item["root"] for item in found], [str(self.repo.resolve())])
+        self.assertEqual(found[0]["count"], 2)
+
+        everything = find_repos(self.base, min_worktrees=1)
+        self.assertEqual(len(everything), 2)
+
+    def test_the_walk_does_not_descend_into_a_repository(self) -> None:
+        from worktree_board.scan import find_repos
+        git("worktree", "add", "-q", str(self.base / "wt"), "-b", "feat", cwd=self.repo)
+        inside = self.repo / "vendor" / "nested"
+        inside.mkdir(parents=True)
+        git("init", "-q", "-b", "main", cwd=inside)
+        # The inner repository is the outer one's business: one row, not two.
+        self.assertEqual(len(find_repos(self.base, min_worktrees=1)), 1)
+
+
 class RepoRootErrorTests(FreshRepoCase):
     """Three ways rev-parse says no, three sentences that say something."""
 

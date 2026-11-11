@@ -13,7 +13,7 @@ import unicodedata
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .scan import GitError, report
+from .scan import GitError, find_repos, report
 from .server import serve
 
 
@@ -137,6 +137,19 @@ def _watch(root: Path, interval: float) -> int:
         return 0
 
 
+def _find(root: Path, minimum: int, as_json: bool) -> int:
+    repos = find_repos(root, minimum)
+    if as_json:
+        print(json.dumps({"root": str(root), "repos": repos}, ensure_ascii=False, indent=2))
+        return 0
+    if not repos:
+        print(f"no repository with {minimum}+ worktree(s) under {_short_path(str(root))}")
+        return 0
+    for repo in repos:
+        print(f"{repo['count']:>3} worktree(s)  {_short_path(repo['root'])}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="wtree", description="A read-only board over git worktrees.")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -148,6 +161,12 @@ def main(argv: list[str] | None = None) -> int:
                     help="redraw in place until ctrl-c (for a terminal already open)")
     ls.add_argument("--interval", type=float, default=1.0, metavar="SECONDS",
                     help="seconds between redraws with --watch (default 1.0)")
+
+    find = sub.add_parser("find", help="survey a directory for repositories that have worktrees")
+    find.add_argument("-C", "--root", default=".", metavar="PATH", help="directory to walk")
+    find.add_argument("--min", type=int, default=2, metavar="N",
+                      help="only report repositories with at least N worktrees (default 2)")
+    find.add_argument("--json", action="store_true", help="machine-readable output")
 
     srv = sub.add_parser("serve", help="serve the board on localhost")
     srv.add_argument("-C", "--root", default=".", metavar="PATH", help="any path inside the repository")
@@ -170,6 +189,8 @@ def main(argv: list[str] | None = None) -> int:
             data = report(root)
             print(json.dumps(data, ensure_ascii=False, indent=2) if args.json else _table(data))
             return 0
+        if args.command == "find":
+            return _find(root, max(args.min, 1), args.json)
         try:
             httpd = serve(root, args.host, args.port)
         except OSError as error:
