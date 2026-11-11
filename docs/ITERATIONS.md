@@ -101,3 +101,9 @@
 - **改了什么**：`GET /` 找不到 `static/index.html` 时返回 500 + `{"error": "missing … — the installed package has no page; reinstall worktree-board"}`，不再让 `FileNotFoundError` 把连接掐掉；新加 1 个用例（把 `INDEX` 指到不存在的路径，断言 500 且文案里出现 `reinstall`）。
 - **为什么**：本机没装 setuptools（`ModuleNotFoundError: No module named 'setuptools'`），`pip install --no-build-isolation .` 直接失败——也就是说这个包的打包路径从 11-07 之后就没被本地验证过一次，全靠 CI。而 CI 现在推不上去。`pyproject.toml` 里 `[tool.setuptools.package-data] worktree_board = ["static/*.html"]` 写了，但真丢了页面时，浏览器只会看到空白，一句解释都没有。
 - **验证**：37 个测试全过；同一场景手测，返回 500 JSON，不再是断连。
+
+### #16 让「页面没进包」这件事在测试里就挂掉
+
+- **改了什么**：新增 `tests/test_packaging.py` 四个检查——`package-data` 里有 `static/*.html`、被承诺的页面文件真的存在、`wtree` 入口指向 `worktree_board.cli:main`、仓库里没有跟踪任何 `.pyc`。Python 3.10 没有 `tomllib`，那两条自动 skip。
+- **为什么**：昨天那条「缺页面就断连」是治标。真正的问题是本机没有 setuptools（`pip install --no-build-isolation .` 直接报 `BackendUnavailable`），安装路径只能靠 CI 验证，而 CI 推不上去。把「页面必须进包」写成测试，至少下次改 `pyproject.toml` 时有人接住。
+- **验证**：41 个测试全过。
