@@ -218,6 +218,16 @@ class FindReposTests(RepoCase):
         self.assertEqual(len(find_repos(self.base, min_worktrees=1)), 1)
 
 
+class SurveyCoverageTests(RepoCase):
+    def test_a_swallowed_directory_is_counted(self) -> None:
+        from worktree_board.scan import survey
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            (base / "a" / "b" / "c").mkdir(parents=True)
+            self.assertEqual(survey(base, 1, max_depth=1)["depth_cut"], 1)
+            self.assertEqual(survey(base, 1, max_depth=6)["depth_cut"], 0)
+
+
 class RepoRootErrorTests(FreshRepoCase):
     """Three ways rev-parse says no, three sentences that say something."""
 

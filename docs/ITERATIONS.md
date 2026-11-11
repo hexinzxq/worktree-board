@@ -114,3 +114,9 @@
 - **为什么**：跑 `find -C ~/Documents -type d -name worktrees` 得到**零结果**——这台机器上一个仓库都没开过 linked worktree，看板的表至今只在测试夹具和自建 demo 上跑过。既然「worktree 在哪」是第一步，就先给个步骤。顺带在真目录上验证：`no repository with 2+ worktree(s) under ~/Documents/deepseek-harness/default-workspace`，是实话。
 - **坑**：第一版把 linked worktree 当成独立仓库（它的 `.git` 是个文件）→ 同一个仓库报两遍。改成 `.git` 是文件就跳过（归属仓库会报它），`.git` 是目录才算检出。
 - **验证**：43 个测试全过；真目录实跑输出上面那句。
+
+### #18 「没找到」和「没看到那么深」得分开说
+
+- **改了什么**：`find` 加 `--depth`（默认 6）；新增 `scan.survey()` 返回 `{root, repos, depth_cut}`，`find_repos()` 变成它的薄壳。深度用完还有目录没走进去时，stderr 打 `note: stopped at 1 level(s) in 6 directories — pass --depth to go deeper`；`--json` 里也有 `depth_cut`。新增 1 个用例（浅走要计数、走够就是 0）。
+- **为什么**：晚上在真目录上拿 `--depth 1` 试，屏幕上只写「no repository…」——听着像「这里什么都没有」，其实是「我一层也没往下看」。sloplint 那边为同一件事改过两次（`not scanned`、`--exclude`），这里不该再犯。
+- **验证**：44 个测试全过；`find -C … --depth 1` 实跑：结论行照旧，stderr 多那句 note。

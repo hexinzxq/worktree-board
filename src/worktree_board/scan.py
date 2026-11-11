@@ -103,20 +103,30 @@ def _parse_list(porcelain: str) -> list[dict]:
 
 
 def find_repos(base: Path, min_worktrees: int = 2, max_depth: int = 6) -> list[dict]:
-    """Walk `base` for repositories that have at least `min_worktrees` worktrees.
+    """Walk `base` for repositories that have at least `min_worktrees` worktrees."""
+    return survey(base, min_worktrees, max_depth)["repos"]
 
-    A checkout is a directory with a `.git` entry (a directory, or the file a
-    linked worktree carries). Found checkouts are not descended into: their
-    submodules and vendored copies belong to them, not to the survey.
+
+def survey(base: Path, min_worktrees: int = 2, max_depth: int = 6) -> dict:
+    """Like `find_repos`, but also say where the walk stopped.
+
+    A checkout is a directory with a `.git` directory; a linked worktree (a
+    `.git` file) is skipped because its owner reports it. Found checkouts are
+    not descended into: their submodules and vendored copies belong to them,
+    not to the survey. Directories the depth limit closed are counted, because
+    "nothing found" and "did not look that deep" are different answers.
     """
     import os
 
     found: list[dict] = []
+    depth_cut = 0
     base = base.resolve()
     for current, dirs, files in os.walk(base):
         here = Path(current)
         depth = len(here.relative_to(base).parts)
         if depth >= max_depth:
+            if dirs:
+                depth_cut += 1
             dirs[:] = []
         if ".git" in files:
             dirs[:] = []  # a linked worktree: its owner repo reports it
@@ -131,7 +141,7 @@ def find_repos(base: Path, min_worktrees: int = 2, max_depth: int = 6) -> list[d
             if count >= min_worktrees:
                 found.append({"root": str(root), "count": count})
     found.sort(key=lambda item: (-item["count"], item["root"]))
-    return found
+    return {"root": str(base), "repos": found, "depth_cut": depth_cut}
 
 
 def _dirty_count(path: Path) -> int:
