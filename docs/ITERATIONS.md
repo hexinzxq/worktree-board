@@ -95,3 +95,9 @@
 - **改了什么**：detached worktree 的分支列从 `(detached <40 位 sha>)` 改成 `(detached 2913c94)`（7 位），网页同一处一起改；新加 1 个用例（表格里出现短 sha、整串 sha 不在输出里）。
 - **为什么**：真造了个 `--detach` 的 worktree 才看见——28 列的分支格被撑到 52 个字符，网页那一格直接把整行顶宽。要认那条提交，7 位足够 `git show`，40 位只配出现在 `--json` 里。
 - **验证**：36 个测试全过；同一个分离头指针场景复跑，分支列回到 `(detached 2913c94)`，表格其余列不再被推歪。
+
+### #15 缺了页面文件时，服务器直接断连
+
+- **改了什么**：`GET /` 找不到 `static/index.html` 时返回 500 + `{"error": "missing … — the installed package has no page; reinstall worktree-board"}`，不再让 `FileNotFoundError` 把连接掐掉；新加 1 个用例（把 `INDEX` 指到不存在的路径，断言 500 且文案里出现 `reinstall`）。
+- **为什么**：本机没装 setuptools（`ModuleNotFoundError: No module named 'setuptools'`），`pip install --no-build-isolation .` 直接失败——也就是说这个包的打包路径从 11-07 之后就没被本地验证过一次，全靠 CI。而 CI 现在推不上去。`pyproject.toml` 里 `[tool.setuptools.package-data] worktree_board = ["static/*.html"]` 写了，但真丢了页面时，浏览器只会看到空白，一句解释都没有。
+- **验证**：37 个测试全过；同一场景手测，返回 500 JSON，不再是断连。

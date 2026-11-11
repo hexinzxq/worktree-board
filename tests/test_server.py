@@ -2,11 +2,15 @@
 from __future__ import annotations
 
 import json
+import tempfile
 import threading
 import unittest
 import urllib.error
 import urllib.request
 
+from pathlib import Path
+
+import worktree_board.server as server_module
 from worktree_board.server import INDEX, serve
 
 from .test_scan import RepoCase, git  # noqa: F401  (RepoCase builds the fixture)
@@ -30,6 +34,20 @@ class ServerTests(RepoCase):
         url = f"http://127.0.0.1:{self.port}{path}"
         with urllib.request.urlopen(url, timeout=5) as response:
             return response.status, response.headers.get("Content-Type", ""), response.read()
+
+    def test_a_install_without_the_page_says_so(self) -> None:
+        # The page lives in package data; a wheel that lost it must explain
+        # itself instead of dropping the connection.
+        with tempfile.TemporaryDirectory() as tmp:
+            server_module.INDEX = Path(tmp) / "index.html"
+            try:
+                with self.assertRaises(urllib.error.HTTPError) as caught:
+                    self.get("/")
+                self.assertEqual(caught.exception.code, 500)
+                body = json.loads(caught.exception.read())
+                self.assertIn("reinstall", body["error"])
+            finally:
+                server_module.INDEX = INDEX
 
     def test_the_page_is_served_at_the_root(self) -> None:
         status, content_type, body = self.get("/")

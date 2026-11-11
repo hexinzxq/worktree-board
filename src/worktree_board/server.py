@@ -38,7 +38,14 @@ def make_handler(root: Path):
         def do_GET(self) -> None:  # noqa: N802 (stdlib naming)
             path = self.path.split("?", 1)[0]
             if path in ("/", "/index.html"):
-                self._send(HTTPStatus.OK, INDEX.read_bytes(), "text/html; charset=utf-8")
+                try:
+                    page = INDEX.read_bytes()
+                except OSError:  # a wheel that shipped without static/ is a real install
+                    self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {
+                        "error": f"missing {INDEX} — the installed package has no page; "
+                                 f"reinstall worktree-board"})
+                else:
+                    self._send(HTTPStatus.OK, page, "text/html; charset=utf-8")
             elif path == "/api/state":
                 try:
                     self._json(HTTPStatus.OK, report(root))
