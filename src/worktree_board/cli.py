@@ -144,7 +144,9 @@ def _find(root: Path, minimum: int, depth: int, as_json: bool) -> int:
         print(json.dumps(data, ensure_ascii=False, indent=2))
         return 0
     if not repos:
-        print(f"no repository with {minimum}+ worktree(s) under {_short_path(str(root))}")
+        seen = data["examined"]
+        print(f"no repository with {minimum}+ worktree(s) under {_short_path(str(root))} "
+              f"(looked at {seen} checkout{'s' if seen != 1 else ''})")
     for repo in repos:
         print(f"{repo['count']:>3} worktree(s)  {_short_path(repo['root'])}")
     if data["depth_cut"]:

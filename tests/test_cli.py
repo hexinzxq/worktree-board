@@ -44,6 +44,19 @@ class DetachedRowTests(unittest.TestCase):
         self.assertNotIn(sha, out)
 
 
+class FindOutputTests(unittest.TestCase):
+    def test_an_empty_survey_says_how_many_it_looked_at(self) -> None:
+        import io as _io
+        from contextlib import redirect_stdout
+        from worktree_board.cli import main
+        with tempfile.TemporaryDirectory() as tmp:
+            buf = _io.StringIO()
+            with redirect_stdout(buf):
+                code = main(["find", "-C", tmp])
+            self.assertEqual(code, 0)
+            self.assertIn("(looked at 0 checkouts)", buf.getvalue())
+
+
 class AgeTests(unittest.TestCase):
     def test_age_units(self) -> None:
         from datetime import datetime, timedelta, timezone

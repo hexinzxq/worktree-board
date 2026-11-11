@@ -120,3 +120,9 @@
 - **改了什么**：`find` 加 `--depth`（默认 6）；新增 `scan.survey()` 返回 `{root, repos, depth_cut}`，`find_repos()` 变成它的薄壳。深度用完还有目录没走进去时，stderr 打 `note: stopped at 1 level(s) in 6 directories — pass --depth to go deeper`；`--json` 里也有 `depth_cut`。新增 1 个用例（浅走要计数、走够就是 0）。
 - **为什么**：晚上在真目录上拿 `--depth 1` 试，屏幕上只写「no repository…」——听着像「这里什么都没有」，其实是「我一层也没往下看」。sloplint 那边为同一件事改过两次（`not scanned`、`--exclude`），这里不该再犯。
 - **验证**：44 个测试全过；`find -C … --depth 1` 实跑：结论行照旧，stderr 多那句 note。
+
+### #19 「什么都没找到」后面补一句「看过几个」
+
+- **改了什么**：`survey()` 多返回 `examined`（一共看了几个检出），`find` 空结果改成 `no repository with 2+ worktree(s) under … (looked at 4 checkouts)`；新增 1 个用例（空目录必须写 `looked at 0 checkouts`）。
+- **为什么**：`find -C ~/Documents` 走完只回「no repository…」，没人知道它是真翻过了，还是压根没进去。四个检出、零个结果和零个检出、零个结果，不是同一个答案。sloplint 的 `not scanned` 是同一课：把搜索的边界说出来。
+- **验证**：45 个测试全过；真目录实跑 `(looked at 4 checkouts)`（default-workspace 下四个 git 仓库，都没有第二个 worktree）。

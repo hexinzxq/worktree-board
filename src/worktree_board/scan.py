@@ -119,6 +119,7 @@ def survey(base: Path, min_worktrees: int = 2, max_depth: int = 6) -> dict:
     import os
 
     found: list[dict] = []
+    examined = 0
     depth_cut = 0
     base = base.resolve()
     for current, dirs, files in os.walk(base):
@@ -138,10 +139,11 @@ def survey(base: Path, min_worktrees: int = 2, max_depth: int = 6) -> dict:
             except GitError:
                 continue
             count = len(scan(root))
+            examined += 1
             if count >= min_worktrees:
                 found.append({"root": str(root), "count": count})
     found.sort(key=lambda item: (-item["count"], item["root"]))
-    return {"root": str(base), "repos": found, "depth_cut": depth_cut}
+    return {"root": str(base), "repos": found, "examined": examined, "depth_cut": depth_cut}
 
 
 def _dirty_count(path: Path) -> int:
