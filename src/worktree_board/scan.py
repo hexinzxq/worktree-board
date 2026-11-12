@@ -240,7 +240,7 @@ def scan(repo: Path) -> list[Worktree]:
         out.append(Worktree(
             path=str(path),
             branch=entry["branch"],
-            head="" if unborn else entry["head"][:12],
+            head="" if unborn else entry["head"],  # full id: --json must be exact
             main=index == 0 and not entry.get("bare"),
             locked=entry["locked"],
             prunable=entry["prunable"],

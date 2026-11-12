@@ -137,6 +137,16 @@ class ScanTests(RepoCase):
         self.assertEqual(trees["gone"].subject, "initial import")
         self.assertNotEqual(trees["gone"].committed_at, "")
 
+    def test_json_keeps_the_whole_commit_id(self) -> None:
+        # Truncation belongs to the renderer; a machine reading --json needs the
+        # id it can hand to `git show`.
+        import json
+        from worktree_board.scan import report
+        data = json.loads(json.dumps(report(self.repo)))
+        head = data["worktrees"][0]["head"]
+        self.assertEqual(len(head), 40)
+        self.assertTrue(all(char in "0123456789abcdef" for char in head))
+
     def test_a_path_outside_a_repository_is_a_git_error(self) -> None:
         with tempfile.TemporaryDirectory() as outside:
             with self.assertRaises(GitError):

@@ -138,3 +138,9 @@
 - **改了什么**：`_last_commit(path, fallback_cwd, head)`——worktree 目录不存在时，改问仓库本体这个 HEAD 的提交（对象还在对象库里）；`fetched_at` 同样回退到仓库本体的 `FETCH_HEAD`。新增断言：删掉目录后 `subject` 仍是 `initial import`、`committed_at` 非空。
 - **为什么**：真删了一个 worktree 的目录再跑 `wtree ls`，`feat (prunable)` 那行的 LAST COMMIT 是空的、AGE 是 `?`——而 `prunable` 恰恰是最需要「它之前死在哪儿」的时刻。表格下半句都提示 `git worktree prune` 了，上半句却说不出它是什么。
 - **验证**：47 个测试全过；同一场景复跑，`feat (prunable)` 行显示 `feat: add b` 与 `just now`。
+
+### #22 `--json` 里的 commit id 被截成了 12 位
+
+- **改了什么**：`scan()` 不再把 `head` 截到 12 位，JSON 里给完整 40 位；表格/页面本来就在显示层自己截到 7 位，没受影响。新增 1 个用例（`report()` 的 `head` 必须是 40 位十六进制）。
+- **为什么**：`--json` 是给机器读的，机器拿到 `2913c94ed0ae` 没法直接 `git show`，还得自己补全。显示层的截断（短 sha、`…`、`~` 路径）是读起来舒服，数据层不该跟着变形。这条和第 10、14 条是同一个边界：好看归渲染，精确归数据。
+- **验证**：48 个测试全过。
