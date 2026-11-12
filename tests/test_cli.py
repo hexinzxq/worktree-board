@@ -44,6 +44,39 @@ class DetachedRowTests(unittest.TestCase):
         self.assertNotIn(sha, out)
 
 
+class SortTests(unittest.TestCase):
+    def payload(self) -> dict:
+        def tree(branch, dirty, behind, when):
+            return {"branch": branch, "main": False, "head": "abc", "dirty": dirty,
+                    "ahead": 0, "behind": behind, "subject": "s", "path": f"/tmp/{branch}",
+                    "committed_at": when, "prunable": False, "locked": False,
+                    "upstream_gone": False}
+        return {"root": "/tmp/r", "totals": {"count": 3, "dirty": 0, "behind": 0},
+                "worktrees": [tree("zeta", 1, 0, "2026-11-05T00:00:00+00:00"),
+                              tree("alpha", 0, 7, "2026-11-10T00:00:00+00:00"),
+                              tree("mid", 3, 2, "2026-11-01T00:00:00+00:00")]}
+
+    def order(self, sort):
+        from worktree_board.cli import _sorted
+        return [tree["branch"] for tree in _sorted(self.payload(), sort)]
+
+    def test_orders(self) -> None:
+        self.assertEqual(self.order(None), ["zeta", "alpha", "mid"])
+        self.assertEqual(self.order("branch"), ["alpha", "mid", "zeta"])
+        self.assertEqual(self.order("dirty"), ["mid", "zeta", "alpha"])
+        self.assertEqual(self.order("behind"), ["alpha", "mid", "zeta"])
+        self.assertEqual(self.order("age"), ["mid", "zeta", "alpha"])
+
+    def test_a_bad_order_is_a_usage_error(self) -> None:
+        import io as _io
+        from contextlib import redirect_stderr
+        from worktree_board.cli import main
+        with redirect_stderr(_io.StringIO()):
+            with self.assertRaises(SystemExit) as caught:
+                main(["ls", "--sort", "banana"])
+        self.assertEqual(caught.exception.code, 2)
+
+
 class FindOutputTests(unittest.TestCase):
     def test_an_empty_survey_says_how_many_it_looked_at(self) -> None:
         import io as _io

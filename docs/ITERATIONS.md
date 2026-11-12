@@ -126,3 +126,9 @@
 - **改了什么**：`survey()` 多返回 `examined`（一共看了几个检出），`find` 空结果改成 `no repository with 2+ worktree(s) under … (looked at 4 checkouts)`；新增 1 个用例（空目录必须写 `looked at 0 checkouts`）。
 - **为什么**：`find -C ~/Documents` 走完只回「no repository…」，没人知道它是真翻过了，还是压根没进去。四个检出、零个结果和零个检出、零个结果，不是同一个答案。sloplint 的 `not scanned` 是同一课：把搜索的边界说出来。
 - **验证**：45 个测试全过；真目录实跑 `(looked at 4 checkouts)`（default-workspace 下四个 git 仓库，都没有第二个 worktree）。
+
+### #20 `--sort`：想按「哪条最旧」看，不用自己扫 AGE 列
+
+- **改了什么**：`wtree ls` 加 `--sort {branch,dirty,behind,age,path}`，`_sorted()` 负责排序（默认仍保持 git 顺序）；`--watch` 也带着这个顺序重画；`--json` 不受影响。新增 2 个用例（五种顺序各自的行序、`--sort banana` 是用法错误 exit 2）。
+- **为什么**：worktree 多起来以后，`AGE` 列再好看也得一列一列扫。真正的问题是「哪条最旧 / 哪条最脏 / 哪条落后最多」，那就该让表按那个问题排；顺手把 `path` 也留着，方便跟文件管理器对齐。
+- **验证**：47 个测试全过。

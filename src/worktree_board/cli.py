@@ -80,11 +80,31 @@ def _pad(text: str, width: int) -> str:
     return text + " " * max(width - _width(text), 0)
 
 
-def _table(data: dict) -> str:
+def _sorted(data: dict, order: str | None) -> list[dict]:
+    """Rows in the order the question wants them.
+
+    Default keeps git's order (main first), which answers "what is here".
+    `age` answers "what is stale", `dirty` and `behind` answer "what is a mess".
+    """
+    trees = list(data["worktrees"])
+    if order == "branch":
+        return sorted(trees, key=lambda tree: (tree["branch"] or "", tree["path"]))
+    if order == "path":
+        return sorted(trees, key=lambda tree: tree["path"])
+    if order == "age":
+        return sorted(trees, key=lambda tree: (tree["committed_at"] or "", tree["path"]))
+    if order == "dirty":
+        return sorted(trees, key=lambda tree: (-max(tree["dirty"], 0), tree["path"]))
+    if order == "behind":
+        return sorted(trees, key=lambda tree: (-(tree["behind"] or 0), tree["path"]))
+    return trees
+
+
+def _table(data: dict, order: str | None = None) -> str:
     rows = []
     header = ("BRANCH", "DIRTY", "AHEAD", "BEHIND", "LAST COMMIT", "AGE", "PATH")
     widths = (28, 5, 5, 6, 46, 8, 0)
-    for tree in data["worktrees"]:
+    for tree in _sorted(data, order):
         branch = tree["branch"] or ("(bare repository)" if tree.get("bare") else f"(detached {tree['head'][:7]})")
         if tree["main"]:  # a bare entry is never the main worktree
             branch += " *"
@@ -126,11 +146,11 @@ def _table(data: dict) -> str:
     return "\n".join(table)
 
 
-def _watch(root: Path, interval: float) -> int:
+def _watch(root: Path, interval: float, order: str | None = None) -> int:
     """Redraw the table until ctrl-c. Clearing first keeps the cursor at home."""
     try:
         while True:
-            sys.stdout.write("\033[2J\033[H" + _table(report(root)) + "\n")
+            sys.stdout.write("\033[2J\033[H" + _table(report(root), order) + "\n")
             sys.stdout.flush()
             time.sleep(interval)
     except KeyboardInterrupt:
@@ -164,6 +184,9 @@ def main(argv: list[str] | None = None) -> int:
     ls = sub.add_parser("ls", help="print every worktree of the repository")
     ls.add_argument("-C", "--root", default=".", metavar="PATH", help="any path inside the repository")
     ls.add_argument("--json", action="store_true", help="machine-readable output")
+    ls.add_argument("--sort", choices=("branch", "dirty", "behind", "age", "path"),
+                    help="row order: branch, dirty (most first), behind (most first), "
+                         "age (oldest first), path")
     ls.add_argument("--watch", action="store_true",
                     help="redraw in place until ctrl-c (for a terminal already open)")
     ls.add_argument("--interval", type=float, default=1.0, metavar="SECONDS",
@@ -194,9 +217,9 @@ def main(argv: list[str] | None = None) -> int:
                 print("error: --interval must be positive", file=sys.stderr)
                 return 2
             if args.watch:
-                return _watch(root, args.interval)
+                return _watch(root, args.interval, args.sort)
             data = report(root)
-            print(json.dumps(data, ensure_ascii=False, indent=2) if args.json else _table(data))
+            print(json.dumps(data, ensure_ascii=False, indent=2) if args.json else _table(data, args.sort))
             return 0
         if args.command == "find":
             return _find(root, max(args.min, 1), max(args.depth, 1), args.json)
