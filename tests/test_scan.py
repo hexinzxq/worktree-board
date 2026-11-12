@@ -147,6 +147,16 @@ class ScanTests(RepoCase):
         self.assertEqual(len(head), 40)
         self.assertTrue(all(char in "0123456789abcdef" for char in head))
 
+    def test_a_missing_path_is_a_git_error_not_a_traceback(self) -> None:
+        from worktree_board.scan import GitError, repo_root, survey
+        with tempfile.TemporaryDirectory() as tmp:
+            ghost = Path(tmp) / "gone"
+            with self.assertRaises(GitError) as caught:
+                repo_root(ghost)
+            self.assertIn("does not exist", str(caught.exception))
+            with self.assertRaises(GitError):
+                survey(ghost)
+
     def test_a_path_outside_a_repository_is_a_git_error(self) -> None:
         with tempfile.TemporaryDirectory() as outside:
             with self.assertRaises(GitError):

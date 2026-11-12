@@ -144,3 +144,9 @@
 - **改了什么**：`scan()` 不再把 `head` 截到 12 位，JSON 里给完整 40 位；表格/页面本来就在显示层自己截到 7 位，没受影响。新增 1 个用例（`report()` 的 `head` 必须是 40 位十六进制）。
 - **为什么**：`--json` 是给机器读的，机器拿到 `2913c94ed0ae` 没法直接 `git show`，还得自己补全。显示层的截断（短 sha、`…`、`~` 路径）是读起来舒服，数据层不该跟着变形。这条和第 10、14 条是同一个边界：好看归渲染，精确归数据。
 - **验证**：48 个测试全过。
+
+### #23 `-C /no/such/dir` 直接吐 traceback
+
+- **改了什么**：`repo_root()` 先断言路径存在、是目录，否则 `GitError`（`… does not exist — pass an existing path` / `… is not a directory`）；`survey()` 对不存在的起始目录同样报错。两个都走 CLI 的 `GitError` 分支：一行 `wtree: …`、exit 2。新增 1 个用例。
+- **为什么**：跑 `wtree ls -C /no/such/dir` 看了一眼——`FileNotFoundError` 的 traceback 从 `subprocess.run` 一路冒到顶，`wtree` 的 20 行栈谁都读不懂。`find -C` 更隐蔽：os.walk 对不存在的目录静默返回空，于是打印「no repository… (looked at 0 checkouts)」——那是「没有」和「没看」混在一起，跟第 18、19 条一个毛病。
+- **验证**：49 个测试全过；两条命令实跑都是 `exit=2` 加一句人话。

@@ -60,6 +60,10 @@ def repo_root(path: Path) -> Path:
     "not a repository at all" is an error, and its two flavours (a plain
     directory, a `.git` directory) get their own sentences.
     """
+    if not path.exists():
+        raise GitError(f"{path} does not exist — pass an existing path")
+    if not path.is_dir():
+        raise GitError(f"{path} is not a directory — pass the repository root")
     done = _git(["rev-parse", "--show-toplevel"], path)
     if done.returncode == 0:
         return Path(done.stdout.strip())
@@ -118,6 +122,8 @@ def survey(base: Path, min_worktrees: int = 2, max_depth: int = 6) -> dict:
     """
     import os
 
+    if not base.is_dir():
+        raise GitError(f"{base} is not a directory — pass a directory to walk")
     found: list[dict] = []
     examined = 0
     depth_cut = 0
