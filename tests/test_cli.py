@@ -67,6 +67,21 @@ class SortTests(unittest.TestCase):
         self.assertEqual(self.order("behind"), ["alpha", "mid", "zeta"])
         self.assertEqual(self.order("age"), ["mid", "zeta", "alpha"])
 
+    def test_age_order_compares_instants_not_strings(self) -> None:
+        # A +08:00 commit one hour old must precede a +00:00 commit one day old,
+        # even though "2026-11-12T09:00:00+08:00" < "2026-11-11T09:00:00+00:00"
+        from worktree_board.cli import _sorted
+        def tree(branch, when):
+            return {"branch": branch, "main": False, "head": "abc", "dirty": 0,
+                    "ahead": 0, "behind": 0, "subject": "s", "path": f"/tmp/{branch}",
+                    "committed_at": when, "prunable": False, "locked": False}
+        data = {"root": "/tmp/r", "totals": {}, "worktrees": [
+            # 02:00 UTC is 10:00 +08:00 — the opposite of the string order.
+            tree("later", "2026-11-12T02:00:00+00:00"),
+            tree("earlier", "2026-11-12T09:00:00+08:00"),
+        ]}
+        self.assertEqual([t["branch"] for t in _sorted(data, "age")], ["earlier", "later"])
+
     def test_a_bad_order_is_a_usage_error(self) -> None:
         import io as _io
         from contextlib import redirect_stderr

@@ -80,6 +80,17 @@ def _pad(text: str, width: int) -> str:
     return text + " " * max(width - _width(text), 0)
 
 
+def _stamp(iso: str) -> float:
+    """A comparable instant; unparsable or empty sorts as the oldest thing."""
+    try:
+        stamp = datetime.fromisoformat(iso)
+    except (TypeError, ValueError):
+        return float("-inf")
+    if stamp.tzinfo is None:
+        stamp = stamp.replace(tzinfo=timezone.utc)
+    return stamp.timestamp()
+
+
 def _sorted(data: dict, order: str | None) -> list[dict]:
     """Rows in the order the question wants them.
 
@@ -92,7 +103,9 @@ def _sorted(data: dict, order: str | None) -> list[dict]:
     if order == "path":
         return sorted(trees, key=lambda tree: tree["path"])
     if order == "age":
-        return sorted(trees, key=lambda tree: (tree["committed_at"] or "", tree["path"]))
+        # %cI keeps the commit's own offset, so comparing the strings would put
+        # an hour-old +08:00 commit after a day-old +00:00 one.
+        return sorted(trees, key=lambda tree: (_stamp(tree["committed_at"]), tree["path"]))
     if order == "dirty":
         return sorted(trees, key=lambda tree: (-max(tree["dirty"], 0), tree["path"]))
     if order == "behind":
