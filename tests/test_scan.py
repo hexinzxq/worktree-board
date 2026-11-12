@@ -131,6 +131,11 @@ class ScanTests(RepoCase):
         self.assertTrue(trees["gone"].prunable)
         self.assertEqual(trees["gone"].dirty, -1)
         self.assertEqual(report(self.repo)["totals"]["prunable"], 1)
+        # The commit survives the checkout: it is in the object database, and
+        # "what was this worktree working on" is the question the row must still
+        # answer.
+        self.assertEqual(trees["gone"].subject, "initial import")
+        self.assertNotEqual(trees["gone"].committed_at, "")
 
     def test_a_path_outside_a_repository_is_a_git_error(self) -> None:
         with tempfile.TemporaryDirectory() as outside:

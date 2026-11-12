@@ -207,14 +207,24 @@ def _fetched_at(path: Path) -> str:
         return ""
 
 
-def _last_commit(path: Path) -> tuple[str, str]:
-    if not path.is_dir():
-        return "", ""
-    out = _git(["log", "-1", "--format=%s%x00%cI"], path)
-    if out.returncode != 0 or not out.stdout.strip():
-        return "", ""
-    subject, _, when = out.stdout.rstrip("\n").partition("\x00")
-    return subject, when
+def _last_commit(path: Path, fallback_cwd: Path | None = None, head: str = "") -> tuple[str, str]:
+    """Subject and time of the commit a worktree points at.
+
+    A checkout that was deleted still has its commit in the repository's object
+    database, so a missing directory falls back to asking the repository about
+    the recorded HEAD: that is exactly the row a reader wants to identify.
+    """
+    if path.is_dir():
+        out = _git(["log", "-1", "--format=%s%x00%cI"], path)
+        if out.returncode == 0 and out.stdout.strip():
+            subject, _, when = out.stdout.rstrip("\n").partition("\x00")
+            return subject, when
+    if fallback_cwd is not None and head:
+        out = _git(["log", "-1", "--format=%s%x00%cI", head], fallback_cwd)
+        if out.returncode == 0 and out.stdout.strip():
+            subject, _, when = out.stdout.rstrip("\n").partition("\x00")
+            return subject, when
+    return "", ""
 
 
 def scan(repo: Path) -> list[Worktree]:
@@ -225,7 +235,7 @@ def scan(repo: Path) -> list[Worktree]:
     for index, entry in enumerate(listing):
         path = Path(entry["path"])
         ahead, behind, upstream_gone = _ahead_behind(path, entry["branch"])
-        subject, when = _last_commit(path)
+        subject, when = _last_commit(path, root, entry["head"])
         unborn = bool(entry["head"]) and set(entry["head"]) == {"0"}
         out.append(Worktree(
             path=str(path),
@@ -239,7 +249,7 @@ def scan(repo: Path) -> list[Worktree]:
             behind=behind,
             subject=subject or ("(no commits yet)" if unborn else ""),
             committed_at=when,
-            fetched_at=_fetched_at(path),
+            fetched_at=_fetched_at(path) or _fetched_at(root),
             upstream_gone=upstream_gone,
             bare=entry.get("bare", False),
         ))

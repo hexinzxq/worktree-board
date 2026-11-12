@@ -132,3 +132,9 @@
 - **改了什么**：`wtree ls` 加 `--sort {branch,dirty,behind,age,path}`，`_sorted()` 负责排序（默认仍保持 git 顺序）；`--watch` 也带着这个顺序重画；`--json` 不受影响。新增 2 个用例（五种顺序各自的行序、`--sort banana` 是用法错误 exit 2）。
 - **为什么**：worktree 多起来以后，`AGE` 列再好看也得一列一列扫。真正的问题是「哪条最旧 / 哪条最脏 / 哪条落后最多」，那就该让表按那个问题排；顺手把 `path` 也留着，方便跟文件管理器对齐。
 - **验证**：47 个测试全过。
+
+### #21 目录没了，那一行连「在干什么」都空了
+
+- **改了什么**：`_last_commit(path, fallback_cwd, head)`——worktree 目录不存在时，改问仓库本体这个 HEAD 的提交（对象还在对象库里）；`fetched_at` 同样回退到仓库本体的 `FETCH_HEAD`。新增断言：删掉目录后 `subject` 仍是 `initial import`、`committed_at` 非空。
+- **为什么**：真删了一个 worktree 的目录再跑 `wtree ls`，`feat (prunable)` 那行的 LAST COMMIT 是空的、AGE 是 `?`——而 `prunable` 恰恰是最需要「它之前死在哪儿」的时刻。表格下半句都提示 `git worktree prune` 了，上半句却说不出它是什么。
+- **验证**：47 个测试全过；同一场景复跑，`feat (prunable)` 行显示 `feat: add b` 与 `just now`。
