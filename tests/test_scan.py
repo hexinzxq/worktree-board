@@ -233,6 +233,15 @@ class FindReposTests(RepoCase):
         everything = find_repos(self.base, min_worktrees=1)
         self.assertEqual(len(everything), 2)
 
+    def test_starting_inside_a_linked_worktree_still_finds_its_repository(self) -> None:
+        # `wtree find -C .` from inside a checkout is the obvious invocation, and
+        # that checkout's `.git` is a file.
+        from worktree_board.scan import survey
+        wt = self.add_worktree("feat")
+        data = survey(wt, min_worktrees=2)
+        self.assertEqual(len(data["repos"]), 1)
+        self.assertEqual(data["repos"][0]["count"], 2)
+
     def test_the_walk_does_not_descend_into_a_repository(self) -> None:
         from worktree_board.scan import find_repos
         git("worktree", "add", "-q", str(self.base / "wt"), "-b", "feat", cwd=self.repo)

@@ -135,10 +135,10 @@ def survey(base: Path, min_worktrees: int = 2, max_depth: int = 6) -> dict:
             if dirs:
                 depth_cut += 1
             dirs[:] = []
-        if ".git" in files:
+        if ".git" in files and depth:
             dirs[:] = []  # a linked worktree: its owner repo reports it
             continue
-        if ".git" in dirs:
+        if ".git" in files or ".git" in dirs:
             dirs[:] = []  # the checkout owns its own tree
             try:
                 root = repo_root(here)
