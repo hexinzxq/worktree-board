@@ -56,6 +56,15 @@ class ServerTests(RepoCase):
         self.assertIn("text/html", content_type)
         self.assertIn(b"worktree-board", body)
 
+    def test_the_page_shows_ages_not_raw_timestamps(self) -> None:
+        # #13 taught the table to say "3d"; the page must not fall back to a
+        # date that needs mental arithmetic.
+        _, _, body = self.get("/")
+        text = body.decode()
+        self.assertIn("function age(", text)
+        self.assertIn('title="${esc(tree.committed_at || \"\")}"', text)
+        self.assertNotIn(".slice(0, 16).replace(\"T\", \" \")", text)
+
     def test_state_is_json_and_matches_the_scanner(self) -> None:
         self.add_worktree("feature-login")
         status, content_type, body = self.get("/api/state")

@@ -141,8 +141,8 @@
     const fresh = document.getElementById("fresh");
     const newest = data.worktrees.map((tree) => tree.fetched_at).filter(Boolean).sort().pop();
     if (t.behind > 0) {
-      const when = newest ? newest.slice(0, 16).replace("T", " ") : "还没 fetch 过";
-      fresh.textContent = `落后数是对着最后一次 fetch 的引用算的（${when}）；要更准，在对应的 worktree 里 git fetch 一次。`;
+      const when = newest ? age(newest) : "还没 fetch 过";
+      fresh.textContent = `落后数是对着最后一次 fetch 算的（${when}）；要更准，在对应的 worktree 里 git fetch 一次。`;
       fresh.hidden = false;
     } else {
       fresh.hidden = true;
@@ -157,9 +157,24 @@
         <td>${stateOf(tree)}</td>
         <td class="num">${tree.upstream_gone ? "gone" : (tree.behind ?? "—")}</td>
         <td class="num">${tree.ahead ?? "—"}</td>
-        <td><span class="subject">${esc(tree.subject || (tree.head ? "—" : "(还没有提交)"))}</span><br><span class="when">${esc((tree.committed_at || "").slice(0, 16).replace("T", " "))}</span></td>
+        <td><span class="subject">${esc(tree.subject || (tree.head ? "—" : "(还没有提交)"))}</span><br><span class="when" title="${esc(tree.committed_at || "")}">${esc(age(tree.committed_at))}</span></td>
         <td class="path">${esc(tree.path)}</td>
       </tr>`).join("");
+  }
+
+  // "12 天前" answers "is this dead?" faster than a date does. The exact
+  // instant stays in the title attribute.
+  function age(iso) {
+    if (!iso) return "—";
+    const then = new Date(iso);
+    if (Number.isNaN(then.getTime())) return "—";
+    const seconds = Math.floor((Date.now() - then.getTime()) / 1000);
+    if (seconds < 60) return "刚刚";
+    const units = [[86400, "天"], [3600, "小时"], [60, "分钟"]];
+    for (const [size, name] of units) {
+      if (seconds >= size) return Math.floor(seconds / size) + " " + name + "前";
+    }
+    return "刚刚";
   }
 
   async function poll() {
