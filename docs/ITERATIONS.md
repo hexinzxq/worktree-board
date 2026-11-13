@@ -186,3 +186,9 @@
 - **改了什么**：`git worktree list --porcelain` 改成 `-z`（NUL 分隔），`_parse_list` 按 NUL 记录解析（`<key> <value>`，空记录结束一条）。表格单元格加 `_printable()`：`\n`/`\t`/`\r` 写成转义、其余控制字符写 `?`，一行永远是一行。新增 3 个用例（NUL 解析带换行与 locked、表行不裂、`_printable`）。
 - **为什么**：行式 porcelain 遇到路径里的换行会把一条拆成两条：`/tmp/wb-nl/line\nbreak` 被读成 `/tmp/wb-nl/line`，于是 DIRTY 显示 `-`（目录不存在）、后面的 `break` 当成未知字段丢掉。换行在路径里合法（`git worktree add $'/tmp/a\nb'` 就行），工具不该因此悄悄报一份错的数据。表格更不能把这种路径原样打出来——一行会变两行，后面所有列都错位。
 - **验证**：61 个测试全过；真造 `$'/tmp/wb-nl/line\nbreak'` 的 worktree，`wtree ls` 现在显示 `/tmp/wb-nl/line\\nbreak`、DIRTY 0。
+
+### #30 一个 git 读不了的仓库，被当成「没有」丢掉了
+
+- **改了什么**：`survey()` 里 `except GitError: continue` 改成记进 `skipped`（路径 + 原因），返回值多一个 `skipped`；`wtree find` 收尾时逐条打 `note: skipped <路径> — <原因>` 到 stderr（`--json` 也带这个字段）。新增 2 个用例（survey 记 skipped、CLI 打 note）。
+- **为什么**：`.git` 坏掉的目录（比如 HEAD 写坏了）以前被静默跳过，输出还是 `no repository with 2+ worktree(s) (looked at 0 checkouts)`——「没有」和「读不了」又变成同一个答案。这个 verb 存在的理由就是这两件事不能混（第 19、21、24 条都在修同一类）。
+- **验证**：62 个测试全过；真造一个 `.git/HEAD` 写坏的目录，`find` 现在打 `note: skipped /private/tmp/wb-t/broken — … is not inside a git repository`。

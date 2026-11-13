@@ -170,6 +170,7 @@ def survey(base: Path, min_worktrees: int = 2, max_depth: int = 6) -> dict:
     if not base.is_dir():
         raise GitError(f"{base} is not a directory — pass a directory to walk")
     found: list[dict] = []
+    skipped: list[dict] = []
     examined = 0
     depth_cut = 0
     base = base.resolve()
@@ -187,14 +188,19 @@ def survey(base: Path, min_worktrees: int = 2, max_depth: int = 6) -> dict:
             dirs[:] = []  # the checkout owns its own tree
             try:
                 root = repo_root(here)
-            except GitError:
+            except GitError as error:
+                # Something here looks like a repository and git refuses it.
+                # Dropping it silently would make "not found" and "not read"
+                # the same answer, which is what this whole verb exists to fix.
+                skipped.append({"path": str(here), "reason": str(error)})
                 continue
             count = len(scan(root))
             examined += 1
             if count >= min_worktrees:
                 found.append({"root": str(root), "count": count})
     found.sort(key=lambda item: (-item["count"], item["root"]))
-    return {"root": str(base), "repos": found, "examined": examined, "depth_cut": depth_cut}
+    return {"root": str(base), "repos": found, "examined": examined,
+            "depth_cut": depth_cut, "skipped": skipped}
 
 
 def _dirty_count(path: Path) -> int:

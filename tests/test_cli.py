@@ -122,6 +122,24 @@ class FindOutputTests(unittest.TestCase):
             self.assertIn("(looked at 0 checkouts)", buf.getvalue())
 
 
+class SkipNoteTests(unittest.TestCase):
+    def test_a_broken_repository_is_named_not_silently_dropped(self) -> None:
+        import io as _io
+        from contextlib import redirect_stderr, redirect_stdout
+
+        from worktree_board.cli import main
+        with tempfile.TemporaryDirectory() as tmp:
+            broken = Path(tmp) / "broken"
+            (broken / ".git").mkdir(parents=True)
+            (broken / ".git" / "HEAD").write_text("garbage\n")
+            out, err = _io.StringIO(), _io.StringIO()
+            with redirect_stdout(out), redirect_stderr(err):
+                code = main(["find", "-C", tmp, "--depth", "2"])
+            self.assertEqual(code, 0)
+            self.assertIn("note: skipped", err.getvalue())
+            self.assertIn("broken", err.getvalue())
+
+
 class AgeTests(unittest.TestCase):
     def test_age_units(self) -> None:
         from datetime import datetime, timedelta, timezone

@@ -300,7 +300,19 @@ class SurveyCoverageTests(RepoCase):
 class RepoRootErrorTests(FreshRepoCase):
     """Three ways rev-parse says no, three sentences that say something."""
 
-    def test_a_plain_directory_is_not_a_repository(self) -> None:
+    def test_a_repository_git_refuses_is_counted_as_skipped(self) -> None:
+        import tempfile
+        from worktree_board.scan import survey
+        with tempfile.TemporaryDirectory() as tmp:
+            broken = Path(tmp) / "broken"
+            (broken / ".git").mkdir(parents=True)
+            (broken / ".git" / "HEAD").write_text("garbage\n")
+            data = survey(Path(tmp), 2, 2)
+            self.assertEqual(data["repos"], [])
+            self.assertEqual([m["path"].rsplit("/", 1)[-1] for m in data["skipped"]], ["broken"])
+            self.assertIn("not", data["skipped"][0]["reason"])
+
+
         from worktree_board.scan import GitError, repo_root
         plain = Path(self.tmp.name) / "plain"
         plain.mkdir()

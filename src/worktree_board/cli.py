@@ -205,6 +205,9 @@ def _find(root: Path, minimum: int, depth: int, as_json: bool) -> int:
               f"(looked at {seen} checkout{'s' if seen != 1 else ''})")
     for repo in repos:
         print(f"{repo['count']:>3} worktree(s)  {_short_path(repo['root'])}")
+    for miss in data.get("skipped", []):
+        print(f"note: skipped {_printable(_short_path(miss['path']))} — "
+              f"{_printable(miss['reason'])}", file=sys.stderr)
     if data["depth_cut"]:
         # "not found" and "did not look" must not read the same.
         print(f"note: stopped at {depth} level(s) in {data['depth_cut']} director"
