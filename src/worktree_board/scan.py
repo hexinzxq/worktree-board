@@ -6,6 +6,8 @@ which is what makes it testable (see tests/test_scan.py).
 """
 from __future__ import annotations
 
+import math
+import os
 import subprocess
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
@@ -16,10 +18,38 @@ class GitError(RuntimeError):
     """A git command failed where the scan needed it to succeed."""
 
 
+DEFAULT_TIMEOUT = 10.0
+
+
+def _timeout() -> float:
+    """How long one git call may take; `WTREE_GIT_TIMEOUT=0` waits forever."""
+    raw = os.environ.get("WTREE_GIT_TIMEOUT", "").strip()
+    try:
+        value = float(raw) if raw else DEFAULT_TIMEOUT
+    except ValueError:
+        return DEFAULT_TIMEOUT
+    return value if value > 0 else math.inf
+
+
 def _git(args: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["git", *args], cwd=str(cwd), capture_output=True, text=True, check=False
-    )
+    limit = _timeout()
+    try:
+        return subprocess.run(
+            ["git", *args],
+            cwd=str(cwd),
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=None if limit == math.inf else limit,
+        )
+    except subprocess.TimeoutExpired:
+        raise GitError(
+            f"git {args[0]} did not finish within {limit:g}s in {cwd} — "
+            f"the repository may be locked, on a slow mount, or waiting on a "
+            f"credential prompt (raise WTREE_GIT_TIMEOUT to wait longer)"
+        ) from None
+    except FileNotFoundError:
+        raise GitError("git is not installed — worktree-board reads worktrees by running it") from None
 
 
 def _must(args: list[str], cwd: Path) -> str:

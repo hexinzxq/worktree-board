@@ -82,6 +82,23 @@ class SortTests(unittest.TestCase):
         ]}
         self.assertEqual([t["branch"] for t in _sorted(data, "age")], ["earlier", "later"])
 
+    def test_watch_survives_a_repository_that_is_briefly_unreadable(self) -> None:
+        import io
+        from contextlib import redirect_stdout
+        from unittest import mock
+
+        from worktree_board.cli import _watch
+        from worktree_board.scan import GitError
+
+        calls = [GitError("git status did not finish within 10s"), KeyboardInterrupt()]
+        with mock.patch("worktree_board.cli.report", side_effect=calls), \
+                mock.patch("worktree_board.cli.time.sleep"):
+            buffer = io.StringIO()
+            with redirect_stdout(buffer):
+                # `report` is mocked, so the root is never touched.
+                self.assertEqual(_watch(Path("."), 5.0), 0)
+        self.assertIn("did not finish within 10s", buffer.getvalue())
+
     def test_a_bad_order_is_a_usage_error(self) -> None:
         import io as _io
         from contextlib import redirect_stderr

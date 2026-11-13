@@ -174,6 +174,29 @@ class ScanTests(RepoCase):
 
 
 class FreshRepoScanTests(FreshRepoCase):
+    def test_a_hung_git_call_becomes_a_sentence_not_a_wait(self) -> None:
+        import subprocess
+        from unittest import mock
+        from worktree_board.scan import GitError, scan
+        with mock.patch.object(
+            subprocess, "run", side_effect=subprocess.TimeoutExpired(["git"], 10.0)
+        ):
+            with self.assertRaises(GitError) as caught:
+                scan(self.repo)
+        message = str(caught.exception)
+        self.assertIn("did not finish within", message)
+        self.assertIn("WTREE_GIT_TIMEOUT", message)
+
+    def test_a_missing_git_binary_says_so(self) -> None:
+        from pathlib import Path
+        from unittest import mock
+
+        from worktree_board.scan import GitError, _git
+        with mock.patch("subprocess.run", side_effect=FileNotFoundError):
+            with self.assertRaises(GitError) as caught:
+                _git(["status"], Path("."))
+        self.assertIn("git is not installed", str(caught.exception))
+
     def test_a_repository_without_commits_says_so(self) -> None:
         trees = scan(self.repo)
         self.assertEqual(len(trees), 1)

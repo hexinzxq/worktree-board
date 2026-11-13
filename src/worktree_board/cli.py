@@ -163,7 +163,13 @@ def _watch(root: Path, interval: float, order: str | None = None) -> int:
     """Redraw the table until ctrl-c. Clearing first keeps the cursor at home."""
     try:
         while True:
-            sys.stdout.write("\033[2J\033[H" + _table(report(root), order) + "\n")
+            try:
+                body = _table(report(root), order)
+            except GitError as error:
+                # A repository that is briefly unreadable (a worktree being
+                # removed, a lock) must not end the watch — say it and go on.
+                body = f"wtree: {error}"
+            sys.stdout.write("\033[2J\033[H" + body + "\n")
             sys.stdout.flush()
             time.sleep(interval)
     except KeyboardInterrupt:

@@ -162,3 +162,9 @@
 - **改了什么**：`survey()` 不再跳过起始目录本身——起点是 linked worktree 时照样当成检出（`.git` 是文件也没关系）；只有往下走遇到的 linked worktree 才交给归属仓库报。新增 1 个用例（从 worktree 里 survey，得到 1 个仓库、2 个 worktree）。
 - **为什么**：夜里在干净副本里验收，`find -C /tmp/wb-ci --depth 1` 回 `no repository with 2+ worktree(s) (looked at 0 checkouts)`——可 `/tmp/wb-ci` 自己就是个检出。`wtree find -C .` 是最自然的用法，第一个该看见的却看不见。
 - **验证**：51 个测试全过；同一条命令现在输出 `2 worktree(s)  /private/tmp/wb-ci`。
+
+### #26 一条卡住的 git 能把整块看板挂住，而且不解释
+
+- **改了什么**：`_git()` 给每个 git 调用加超时（默认 10s，`WTREE_GIT_TIMEOUT` 可调，`0` = 一直等），超时抛 `GitError`：`git rev-parse did not finish within 1s in /tmp — the repository may be locked, on a slow mount, or waiting on a credential prompt (raise WTREE_GIT_TIMEOUT to wait longer)`；找不到 git 也给一句人话。`--watch` 里单帧 `GitError` 不再结束循环，清屏重画那行错误、继续等下一帧。新增 3 个用例（超时、缺 git、watch 容错）。
+- **为什么**：`subprocess.run` 原来没有超时。服务端每 5 秒轮询一次状态，仓库在慢挂载上、被锁住、或 git 想弹凭据提示时，整个请求就静默挂在那里——页面转圈，没有任何线索。`--watch` 更脆：临时读不到仓库（比如正在删一个 worktree）会让整条 watch 直接退出。
+- **验证**：54 个测试全过；用 PATH 里塞一个 `sleep 30` 的假 git、`WTREE_GIT_TIMEOUT=1` 实跑，输出上面那句话、exit 2。
