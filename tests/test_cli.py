@@ -170,6 +170,33 @@ class BranchNameTests(unittest.TestCase):
         self.assertEqual(_short_path("/tmp/x", home=P("/Users/x")), "/tmp/x")
 
 
+class ControlCharTests(unittest.TestCase):
+    def test_a_newline_in_a_path_does_not_wrap_the_row(self) -> None:
+        from worktree_board.cli import _printable
+        self.assertEqual(_printable("/tmp/line\nbreak"), "/tmp/line\\nbreak")
+        self.assertEqual(_printable("a\tb"), "a\\tb")
+
+    def test_a_path_with_a_newline_stays_one_row(self) -> None:
+        # The parser now reads NUL-separated porcelain, and the table must not
+        # let that newline break the row apart.
+        import io
+        from contextlib import redirect_stdout
+        from unittest import mock
+
+        from worktree_board.cli import _table
+        data = {"root": "/tmp/r", "totals": {"count": 1, "dirty": 0, "behind": 0,
+                                            "prunable": 0, "locked": 0, "upstream_gone": 0},
+                "worktrees": [{"path": "/tmp/r/line\nbreak", "branch": "main", "head": "abc",
+                               "main": True, "locked": False, "prunable": False, "dirty": 0,
+                               "ahead": None, "behind": None, "subject": "x",
+                               "committed_at": "", "fetched_at": "", "upstream_gone": False,
+                               "bare": False}]}
+        with redirect_stdout(io.StringIO()):
+            table = _table(data)
+        self.assertIn("/tmp/r/line\\nbreak", table)
+        self.assertEqual(len([line for line in table.splitlines() if "main" in line or "line" in line]), 1)
+
+
 class WideTextTests(unittest.TestCase):
     """CJK counts as two cells; a table that pads by len() leans right of the header."""
 

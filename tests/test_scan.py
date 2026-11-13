@@ -174,6 +174,18 @@ class ScanTests(RepoCase):
 
 
 class FreshRepoScanTests(FreshRepoCase):
+    def test_porcelain_is_read_nul_separated(self) -> None:
+        from worktree_board.scan import _parse_list
+        listing = (
+            "worktree /tmp/r\0HEAD abc\0branch refs/heads/main\0\0"
+            "worktree /tmp/r/line\nbreak\0HEAD def\0detached\0locked\0\0"
+        )
+        entries = _parse_list(listing)
+        self.assertEqual(len(entries), 2)
+        self.assertEqual(entries[1]["path"], "/tmp/r/line\nbreak")
+        self.assertTrue(entries[1]["locked"])
+        self.assertIsNone(entries[1]["branch"])
+
     def test_a_hung_git_call_becomes_a_sentence_not_a_wait(self) -> None:
         import subprocess
         from unittest import mock

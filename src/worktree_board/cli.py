@@ -17,6 +17,23 @@ from .scan import GitError, report, survey
 from .server import serve
 
 
+def _printable(text: str) -> str:
+    """One table row must stay one line: spell control characters out."""
+    out = []
+    for ch in text:
+        if ch == "\n":
+            out.append("\\n")
+        elif ch == "\t":
+            out.append("\\t")
+        elif ch == "\r":
+            out.append("\\r")
+        elif ord(ch) < 32 or ord(ch) == 127:
+            out.append("?")
+        else:
+            out.append(ch)
+    return "".join(out)
+
+
 def _width(text: str) -> int:
     """Terminal cells a string occupies — CJK characters take two, not one."""
     return sum(2 if unicodedata.east_asian_width(ch) in ("W", "F") else 1 for ch in text)
@@ -126,13 +143,13 @@ def _table(data: dict, order: str | None = None) -> str:
         if tree["locked"]:
             branch += " (locked)"
         rows.append((
-            _cell(branch, widths[0], keep_tail=True),
+            _cell(_printable(branch), widths[0], keep_tail=True),
             "-" if tree["dirty"] < 0 else str(tree["dirty"]),
             "-" if tree["ahead"] is None else str(tree["ahead"]),
             "gone" if tree.get("upstream_gone") else ("-" if tree["behind"] is None else str(tree["behind"])),
-            _cell(tree["subject"], widths[4]),
+            _cell(_printable(tree["subject"]), widths[4]),
             _age(tree["committed_at"]),
-            _short_path(tree["path"]),
+            _printable(_short_path(tree["path"])),
         ))
     table = ["  ".join(_pad(header[i], widths[i]) if widths[i] else header[i]
                        for i in range(len(header)))]

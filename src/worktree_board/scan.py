@@ -107,30 +107,45 @@ def repo_root(path: Path) -> Path:
 
 
 def _parse_list(porcelain: str) -> list[dict]:
+    """Parse `git worktree list --porcelain -z`.
+
+    NUL-separated on purpose: a checkout path may contain a newline, and the
+    line-based form would cut such a path in two and report a directory that
+    does not exist. Fields are `<key> <value>`; an empty record ends an entry.
+    """
     entries: list[dict] = []
     current: dict | None = None
-    for line in porcelain.splitlines():
-        if line.startswith("worktree "):
+
+    def fresh(path: str) -> dict:
+        return {"path": path, "branch": None, "head": "", "main": False,
+                "locked": False, "prunable": False, "bare": False}
+
+    for token in porcelain.split("\0"):
+        if not token:
             if current is not None:
                 entries.append(current)
-            current = {"path": line[len("worktree "):], "branch": None,
-                       "head": "", "main": False, "locked": False, "prunable": False,
-                       "bare": False}
+                current = None
+            continue
+        key, _, value = token.partition(" ")
+        if key == "worktree":
+            if current is not None:
+                entries.append(current)
+            current = fresh(value)
         elif current is None:
             continue
-        elif line.startswith("HEAD "):
-            current["head"] = line[len("HEAD "):]
-        elif line.startswith("branch "):
-            ref = line[len("branch "):]
+        elif key == "HEAD":
+            current["head"] = value
+        elif key == "branch":
+            ref = value
             current["branch"] = ref[len("refs/heads/"):] if ref.startswith("refs/heads/") else ref
-        elif line == "detached":
+        elif key == "detached":
             current["branch"] = None
-        elif line.startswith("locked"):
+        elif key == "locked":
             current["locked"] = True
-        elif line == "bare":
-            current["bare"] = True
-        elif line.startswith("prunable"):
+        elif key == "prunable":
             current["prunable"] = True
+        elif key == "bare":
+            current["bare"] = True
     if current is not None:
         entries.append(current)
     return entries
@@ -266,7 +281,7 @@ def _last_commit(path: Path, fallback_cwd: Path | None = None, head: str = "") -
 def scan(repo: Path) -> list[Worktree]:
     """Every worktree of the repository at `repo`, main one first (git's order)."""
     root = repo_root(repo)
-    listing = _parse_list(_must(["worktree", "list", "--porcelain"], root))
+    listing = _parse_list(_must(["worktree", "list", "--porcelain", "-z"], root))
     out: list[Worktree] = []
     for index, entry in enumerate(listing):
         path = Path(entry["path"])
