@@ -168,3 +168,9 @@
 - **改了什么**：`_git()` 给每个 git 调用加超时（默认 10s，`WTREE_GIT_TIMEOUT` 可调，`0` = 一直等），超时抛 `GitError`：`git rev-parse did not finish within 1s in /tmp — the repository may be locked, on a slow mount, or waiting on a credential prompt (raise WTREE_GIT_TIMEOUT to wait longer)`；找不到 git 也给一句人话。`--watch` 里单帧 `GitError` 不再结束循环，清屏重画那行错误、继续等下一帧。新增 3 个用例（超时、缺 git、watch 容错）。
 - **为什么**：`subprocess.run` 原来没有超时。服务端每 5 秒轮询一次状态，仓库在慢挂载上、被锁住、或 git 想弹凭据提示时，整个请求就静默挂在那里——页面转圈，没有任何线索。`--watch` 更脆：临时读不到仓库（比如正在删一个 worktree）会让整条 watch 直接退出。
 - **验证**：54 个测试全过；用 PATH 里塞一个 `sleep 30` 的假 git、`WTREE_GIT_TIMEOUT=1` 实跑，输出上面那句话、exit 2。
+
+### #27 每个标签页每 5 秒各扫一遍仓库
+
+- **改了什么**：`/api/state` 现在共享一次扫描：`make_handler(root, ttl=2.0)` 里放一个 `{at, value}` 缓存加一把锁，`ttl` 秒内（默认 2s，`serve(..., ttl=)` 可调，`ttl<=0` 关掉）多个请求拿到同一份报告；并发请求在锁上等那一次扫描，而不是各起一份。新增 3 个用例（连续两次只扫一次、4 个并发只扫一次、ttl 过期后重扫）。
+- **为什么**：页面每 5 秒轮询一次，每次 `report()` 都会对每个 worktree 跑一次 `git status` + `git rev-list`。开两个标签页就是双倍；慢仓库上这些请求还会叠起来（ThreadingHTTPServer 每个请求一个线程）。看板是「围着看」的工具，扫描次数应该跟仓库变化次数走，不该跟开着的窗口数走。
+- **验证**：57 个测试全过；用计数版 `report` 验证 4 个并发请求只触发 1 次扫描。

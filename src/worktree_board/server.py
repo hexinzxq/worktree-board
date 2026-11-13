@@ -11,14 +11,34 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+import threading
+import time
+
 from .scan import report
 
 STATIC = Path(__file__).parent / "static"
 INDEX = STATIC / "index.html"
 
 
-def make_handler(root: Path):
-    """Bind a request handler to one repository root."""
+def make_handler(root: Path, ttl: float = 2.0):
+    """Bind a request handler to one repository root.
+
+    Scans are shared for `ttl` seconds: the page polls every 5s, and a second
+    tab must not make the machine run `git status` twice for the same answer.
+    Concurrent requests wait for the one scan instead of starting their own.
+    """
+    cache: dict = {"at": float("-inf"), "value": None}
+    lock = threading.Lock()
+
+    def state() -> dict:
+        if ttl <= 0:
+            return report(root)
+        with lock:  # also serialises the scan, so two tabs scan once
+            now = time.monotonic()
+            if cache["value"] is None or now - cache["at"] >= ttl:
+                cache["value"] = report(root)
+                cache["at"] = now
+            return cache["value"]
 
     class Handler(BaseHTTPRequestHandler):
         server_version = "worktree-board/0.1"
@@ -48,7 +68,7 @@ def make_handler(root: Path):
                     self._send(HTTPStatus.OK, page, "text/html; charset=utf-8")
             elif path == "/api/state":
                 try:
-                    self._json(HTTPStatus.OK, report(root))
+                    self._json(HTTPStatus.OK, state())
                 except Exception as error:  # a broken checkout must not kill the server
                     self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(error)})
             else:
@@ -60,6 +80,6 @@ def make_handler(root: Path):
     return Handler
 
 
-def serve(root: Path, host: str = "127.0.0.1", port: int = 8765) -> ThreadingHTTPServer:
-    httpd = ThreadingHTTPServer((host, port), make_handler(root))
+def serve(root: Path, host: str = "127.0.0.1", port: int = 8765, ttl: float = 2.0) -> ThreadingHTTPServer:
+    httpd = ThreadingHTTPServer((host, port), make_handler(root, ttl))
     return httpd

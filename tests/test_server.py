@@ -19,7 +19,8 @@ from .test_scan import RepoCase, git  # noqa: F401  (RepoCase builds the fixture
 class ServerTests(RepoCase):
     def setUp(self) -> None:
         super().setUp()
-        self.httpd = serve(self.repo, "127.0.0.1", 0)
+        # No cache in these tests: they add worktrees after the server starts.
+        self.httpd = serve(self.repo, "127.0.0.1", 0, ttl=0)
         self.port = self.httpd.server_address[1]
         self.thread = threading.Thread(target=self.httpd.serve_forever, daemon=True)
         self.thread.start()
@@ -94,3 +95,69 @@ class PageTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CacheTests(RepoCase):
+    """The page polls every 5s; two tabs must not double the git calls."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.calls = 0
+        self.real_report = server_module.report
+
+        def counting(root):
+            self.calls += 1
+            return self.real_report(root)
+
+        server_module.report = counting
+        self.httpd = serve(self.repo, "127.0.0.1", 0, ttl=60.0)
+        self.port = self.httpd.server_address[1]
+        self.thread = threading.Thread(target=self.httpd.serve_forever, daemon=True)
+        self.thread.start()
+
+    def tearDown(self) -> None:
+        self.httpd.shutdown()
+        self.httpd.server_close()
+        self.thread.join(timeout=2)
+        server_module.report = self.real_report
+        super().tearDown()
+
+    def get(self, path: str) -> bytes:
+        with urllib.request.urlopen(f"http://127.0.0.1:{self.port}{path}", timeout=5) as r:
+            return r.read()
+
+    def test_back_to_back_polls_share_one_scan(self) -> None:
+        first = self.get("/api/state")
+        second = self.get("/api/state")
+        self.assertEqual(first, second)
+        self.assertEqual(self.calls, 1)
+
+    def test_concurrent_polls_wait_for_one_scan(self) -> None:
+        threads = [threading.Thread(target=self.get, args=("/api/state",)) for _ in range(4)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(timeout=10)
+        self.assertEqual(self.calls, 1)
+
+    def test_the_ttl_expires(self) -> None:
+        self.get("/api/state")
+        self.assertEqual(self.calls, 1)
+        import worktree_board.server as mod
+        # second server with a tiny ttl, on the same repo
+        httpd = mod.serve(self.repo, "127.0.0.1", 0, ttl=0.01)
+        port = httpd.server_address[1]
+        thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+        thread.start()
+        try:
+            with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/state", timeout=5) as r:
+                r.read()
+            import time as _time
+            _time.sleep(0.05)
+            with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/state", timeout=5) as r:
+                r.read()
+        finally:
+            httpd.shutdown()
+            httpd.server_close()
+            thread.join(timeout=2)
+        self.assertEqual(self.calls, 3)
