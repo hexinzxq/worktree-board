@@ -210,3 +210,9 @@
 - **改了什么**：`_parse_list` 把 `locked <reason>` 里的原因收进新字段 `locked_reason`（`Worktree` / `--json` 都有）；表格仍写 `(locked)`，原因另起一行 `note: <路径> is locked — <原因>`（分支列只有 28 格，一句话塞进去会被截成 `… not prune`）；网页徽章的 `title` 带上原因。新增 3 个用例（解析保留原因、真 git `worktree lock --reason` 下 CLI 打 note、`--json` 有字段且 totals 计 1）。
 - **为什么**：`git worktree lock --reason "lives on the USB stick, do not prune"` 是 git 留给人看的一句话——为什么这条不能 prune。工具把它收下再扔掉，看板就只剩一个 `(locked)`，读者还得回去敲 git。真实输入：临时仓库 `/tmp/wb-lock/r` + `wt-usb` 锁了原因，改前 CLI 只有 `(locked)`，改后多一行 note。
 - **验证**：68 个测试全过；真仓库上 `wtree ls` 打出 `note: /private/tmp/wb-lock/wt-usb is locked — lives on the USB stick, do not prune`，`--json` 里 `locked_reason` 正确；页面改动过 `sloplint`（`clean: 0 tells, 0 failures`）。
+
+### #34 `serve` 在一个不是仓库的目录上，先给 URL 再永远 500
+
+- **改了什么**：`serve` 在绑定端口之前先 `repo_root(root)` 验一遍——不是仓库就直接 `wtree: … is not inside a git repository`、exit 2，不打印横幅。新增用例：把 `serve()` 打桩，非仓库目录必须 return 2、文案对、`serve()` 一次都没被调用。
+- **为什么**：真跑出来的——`wtree serve -C /tmp/notrepo-x` 会照常打印 `worktree-board  http://127.0.0.1:63192`，然后页面每个 `/api/state` 都 500 `not inside a git repository`。那时候 URL 已经被复制进浏览器了。端口占用了还能「换 --port」，这种是「地址是对的，内容是错的」，比报错难查。
+- **验证**：69 个测试全过；把 `repo_root(root)` 那行 stash 掉单跑新用例会立刻失败（0.1s），加回来就过——这里特意用打桩而不是真实起服务，否则回归时测试会挂死在 accept() 里而不是失败。真目录上 `serve` 现在打一行错误。

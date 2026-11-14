@@ -13,7 +13,7 @@ import unicodedata
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .scan import GitError, report, survey
+from .scan import GitError, report, repo_root, survey
 from .server import serve
 
 
@@ -282,6 +282,9 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if args.command == "find":
             return _find(root, max(args.min, 1), max(args.depth, 1), args.json)
+        # Say "not a repository" before binding: a URL that only ever answers
+        # 500 is worse than a sentence, and a person will have copied it already.
+        repo_root(root)
         try:
             httpd = serve(root, args.host, args.port)
         except OSError as error:

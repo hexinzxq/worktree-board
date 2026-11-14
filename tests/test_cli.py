@@ -439,6 +439,20 @@ class LsTests(RepoCase):
         self.assertEqual(locked["locked_reason"], "lives on the USB stick, do not prune")
         self.assertEqual(data["totals"]["locked"], 1)
 
+    def test_serve_refuses_a_directory_that_is_not_a_repository(self) -> None:
+        # Before this, it bound, printed a URL, and every request answered 500.
+        # Patch serve() out: a regression must fail here, not hang in accept().
+        from unittest import mock
+        import worktree_board.cli as cli_module
+        outsider = self.base / "not-a-repo"
+        outsider.mkdir()
+        with mock.patch.object(cli_module, "serve") as fake:
+            code, out = run("serve", "-C", str(outsider), "--port", "0")
+        fake.assert_not_called()
+        self.assertEqual(code, 2)
+        self.assertIn("is not inside a git repository", out)
+        self.assertNotIn("worktree-board  http", out)
+
 
 if __name__ == "__main__":
     unittest.main()
