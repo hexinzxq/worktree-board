@@ -130,13 +130,27 @@ def _sorted(data: dict, order: str | None) -> list[dict]:
     return trees
 
 
-def _table(data: dict, order: str | None = None) -> str:
+def _inside(here: Path | None, path: str) -> bool:
+    """Is `here` inside this worktree? Both sides are resolved first."""
+    if here is None:
+        return False
+    try:
+        here = Path(here).resolve()
+        base = Path(path).resolve()
+    except OSError:
+        return False
+    return here == base or base in here.parents
+
+
+def _table(data: dict, order: str | None = None, here: Path | None = None) -> str:
     rows = []
     header = ("BRANCH", "DIRTY", "AHEAD", "BEHIND", "LAST COMMIT", "AGE", "PATH")
     widths = (28, 5, 5, 6, 46, 8, 0)
     for tree in _sorted(data, order):
         branch = tree["branch"] or ("(bare repository)" if tree.get("bare") else f"(detached {tree['head'][:7]})")
         if tree["main"]:  # a bare entry is never the main worktree
+            branch += " (main)"
+        if _inside(here, tree["path"]):  # the one your shell is standing in
             branch += " *"
         if tree["prunable"]:
             branch += " (prunable)"
@@ -181,7 +195,7 @@ def _watch(root: Path, interval: float, order: str | None = None) -> int:
     try:
         while True:
             try:
-                body = _table(report(root), order)
+                body = _table(report(root), order, Path.cwd())
             except GitError as error:
                 # A repository that is briefly unreadable (a worktree being
                 # removed, a lock) must not end the watch — say it and go on.
@@ -258,7 +272,8 @@ def main(argv: list[str] | None = None) -> int:
             if args.watch:
                 return _watch(root, args.interval, args.sort)
             data = report(root)
-            print(json.dumps(data, ensure_ascii=False, indent=2) if args.json else _table(data, args.sort))
+            print(json.dumps(data, ensure_ascii=False, indent=2)
+                  if args.json else _table(data, args.sort, Path.cwd()))
             return 0
         if args.command == "find":
             return _find(root, max(args.min, 1), max(args.depth, 1), args.json)

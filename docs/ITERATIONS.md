@@ -192,3 +192,9 @@
 - **改了什么**：`survey()` 里 `except GitError: continue` 改成记进 `skipped`（路径 + 原因），返回值多一个 `skipped`；`wtree find` 收尾时逐条打 `note: skipped <路径> — <原因>` 到 stderr（`--json` 也带这个字段）。新增 2 个用例（survey 记 skipped、CLI 打 note）。
 - **为什么**：`.git` 坏掉的目录（比如 HEAD 写坏了）以前被静默跳过，输出还是 `no repository with 2+ worktree(s) (looked at 0 checkouts)`——「没有」和「读不了」又变成同一个答案。这个 verb 存在的理由就是这两件事不能混（第 19、21、24 条都在修同一类）。
 - **验证**：62 个测试全过；真造一个 `.git/HEAD` 写坏的目录，`find` 现在打 `note: skipped /private/tmp/wb-t/broken — … is not inside a git repository`。
+
+### #31 `*` 标的是 main，可你人明明在另一个 worktree 里
+
+- **改了什么**：表格的 `*` 改成「你 shell 所在的那个 worktree」（`_inside()` 解析后比较相等或父目录），main 改成在分支名后写 `(main)`。新增 3 个用例（星跟着 shell 走、main 仍被标出来、在两个 worktree 之外就不打星）；顺手更新两条期望 `main *` 的老用例。
+- **为什么**：`*` 在 git 里是「当前分支」，这里却一直是「主 worktree」。于是你站在 `feature-x` 里跑 `wtree ls`，star 落在 `main` 那一行，最自然的读法恰好是错的。看板第一眼要回答的是「我在哪、旁边还有谁」。
+- **验证**：65 个测试全过；在 `git worktree add` 出来的副本里跑，`star-demo *` 打在自己那行，`main (main)` 保持标注。

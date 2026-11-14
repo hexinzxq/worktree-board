@@ -188,6 +188,41 @@ class BranchNameTests(unittest.TestCase):
         self.assertEqual(_short_path("/tmp/x", home=P("/Users/x")), "/tmp/x")
 
 
+class StarTests(unittest.TestCase):
+    """The star must mean "you are here", not "this happens to be main"."""
+
+    def data(self, main_path, other_path):
+        def tree(path, main):
+            return {"path": path, "branch": "main" if main else "feat", "head": "abc",
+                    "main": main, "locked": False, "prunable": False, "dirty": 0,
+                    "ahead": None, "behind": None, "subject": "x", "committed_at": "",
+                    "fetched_at": "", "upstream_gone": False, "bare": False}
+        return {"root": "/tmp/r", "worktrees": [tree(main_path, True), tree(other_path, False)],
+                "totals": {"count": 2, "dirty": 0, "behind": 0, "prunable": 0,
+                           "locked": 0, "upstream_gone": 0}}
+
+    def test_the_star_follows_the_shell_not_main(self) -> None:
+        from worktree_board.cli import _table
+        data = self.data("/tmp/r/repo", "/tmp/r/wt")
+        table = _table(data, None, Path("/tmp/r/wt"))
+        lines = {line.split()[0]: line for line in table.splitlines() if line.startswith(("main", "feat"))}
+        self.assertIn("feat", lines["feat"])
+        self.assertTrue(lines["feat"].rstrip().endswith("*") or lines["feat"].split()[1] == "*")
+        self.assertNotIn("feat *", lines["main"])
+
+    def test_main_is_named_even_without_a_star(self) -> None:
+        from worktree_board.cli import _table
+        table = _table(self.data("/tmp/r/repo", "/tmp/r/wt"), None, Path("/elsewhere"))
+        report = [line for line in table.splitlines() if "(main)" in line]
+        self.assertEqual(len(report), 1)
+        self.assertIn("/tmp/r/repo", report[0])
+
+    def test_from_outside_every_worktree_nothing_is_starred(self) -> None:
+        from worktree_board.cli import _table
+        table = _table(self.data("/tmp/r/repo", "/tmp/r/wt"), None, Path("/"))
+        self.assertNotIn("*", table)
+
+
 class ControlCharTests(unittest.TestCase):
     def test_a_newline_in_a_path_does_not_wrap_the_row(self) -> None:
         from worktree_board.cli import _printable
@@ -259,7 +294,7 @@ class LsTests(RepoCase):
         self.assertIn("BRANCH", out)
         self.assertIn("LAST COMMIT", out)
         self.assertIn("1 worktree(s)", out)
-        self.assertIn("main *", out)
+        self.assertIn("main (main)", out)
 
     def test_json_is_the_same_report_the_server_serves(self) -> None:
         self.add_worktree("feature-login")
@@ -355,7 +390,7 @@ class LsTests(RepoCase):
             process.terminate()
             out, _ = process.communicate(timeout=10)
         self.assertGreaterEqual(out.count("\033[2J"), 2)
-        self.assertIn("main *", out)
+        self.assertIn("main (main)", out)
 
 
 if __name__ == "__main__":
