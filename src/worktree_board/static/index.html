@@ -123,7 +123,10 @@
     else if (tree.dirty === 0) bits.push('<span class="badge clean">净</span>');
     if ((tree.behind ?? 0) > 0) bits.push('<span class="badge behind">落后</span>');
     if (tree.prunable) bits.push('<span class="badge behind">已不存在</span>');
-    if (tree.locked) bits.push('<span class="badge dirty">锁定</span>');
+    if (tree.locked) {
+      const why = tree.locked_reason ? `锁定: ${tree.locked_reason}` : "锁定";
+      bits.push(`<span class="badge dirty" title="${esc(tree.locked_reason || "")}">${esc(why)}</span>`);
+    }
     if (tree.upstream_gone) bits.push('<span class="badge behind">上游已删</span>');
     return bits.join("");
   }

@@ -77,6 +77,7 @@ class Worktree:
     fetched_at: str  # ISO 8601 of the last fetch; "" when never fetched
     upstream_gone: bool = False  # the tracked branch was deleted on the remote
     bare: bool = False  # this entry is the bare repository itself, not a checkout
+    locked_reason: str = ""  # why it was locked (`git worktree lock --reason …`)
 
     def as_json(self) -> dict:
         return asdict(self)
@@ -118,7 +119,7 @@ def _parse_list(porcelain: str) -> list[dict]:
 
     def fresh(path: str) -> dict:
         return {"path": path, "branch": None, "head": "", "main": False,
-                "locked": False, "prunable": False, "bare": False}
+                "locked": False, "locked_reason": "", "prunable": False, "bare": False}
 
     for token in porcelain.split("\0"):
         if not token:
@@ -142,6 +143,8 @@ def _parse_list(porcelain: str) -> list[dict]:
             current["branch"] = None
         elif key == "locked":
             current["locked"] = True
+            # `locked <reason>` when the lock was given a reason; bare `locked` otherwise.
+            current["locked_reason"] = value
         elif key == "prunable":
             current["prunable"] = True
         elif key == "bare":
@@ -309,6 +312,7 @@ def scan(repo: Path) -> list[Worktree]:
             fetched_at=_fetched_at(path) or _fetched_at(root),
             upstream_gone=upstream_gone,
             bare=entry.get("bare", False),
+            locked_reason=entry.get("locked_reason", ""),
         ))
     return out
 

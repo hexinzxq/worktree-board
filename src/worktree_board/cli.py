@@ -184,6 +184,11 @@ def _table(data: dict, order: str | None = None, here: Path | None = None) -> st
     if any(tree.get("upstream_gone") for tree in data["worktrees"]):
         table.append("note: upstream branch missing (deleted on the remote, or not fetched yet) — "
                      "`git branch -u origin/<branch>` to re-point it")
+    for tree in data["worktrees"]:
+        if tree["locked"] and tree.get("locked_reason"):
+            # The branch column is 28 wide; a sentence belongs on its own line.
+            table.append(f"note: {_short_path(tree['path'])} is locked — "
+                         f"{_printable(tree['locked_reason'])}")
     if totals.get("prunable"):
         table.append(f"note: {totals['prunable']} worktree(s) no longer exist on disk — "
                      f"run `git worktree prune` to forget them")

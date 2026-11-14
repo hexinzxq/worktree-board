@@ -204,3 +204,9 @@
 - **改了什么**：启动横幅与 `ctrl-c to stop` 都加 `flush=True`。新增用例：把 `serve --port 0` 的 stdout 接成 PIPE，10 秒内必须读到 `worktree-board  http://127.0.0.1:<port>  (…)`，并断言打印出来的端口不是 0。
 - **为什么**：真实场景——想把 serve 挂到日志里再拿 URL，`> /tmp/srv.out` 之后文件一直是空的：Python 对管道是块缓冲（4KB 才刷），终端里看得见、一进管道就消失。配合 `--port 0` 更糟，那行是唯一会说「选了哪个端口」的地方，缓冲住就等于没有。日志/守护进程/CI 里跑都是这个形状。
 - **验证**：66 个测试全过；把 `flush=True` 去掉单跑新用例会失败（`the banner is still in the buffer, not on stdout`），加回来才过。
+
+### #33 锁住的原因被读丢了：只有一个 `(locked)`
+
+- **改了什么**：`_parse_list` 把 `locked <reason>` 里的原因收进新字段 `locked_reason`（`Worktree` / `--json` 都有）；表格仍写 `(locked)`，原因另起一行 `note: <路径> is locked — <原因>`（分支列只有 28 格，一句话塞进去会被截成 `… not prune`）；网页徽章的 `title` 带上原因。新增 3 个用例（解析保留原因、真 git `worktree lock --reason` 下 CLI 打 note、`--json` 有字段且 totals 计 1）。
+- **为什么**：`git worktree lock --reason "lives on the USB stick, do not prune"` 是 git 留给人看的一句话——为什么这条不能 prune。工具把它收下再扔掉，看板就只剩一个 `(locked)`，读者还得回去敲 git。真实输入：临时仓库 `/tmp/wb-lock/r` + `wt-usb` 锁了原因，改前 CLI 只有 `(locked)`，改后多一行 note。
+- **验证**：68 个测试全过；真仓库上 `wtree ls` 打出 `note: /private/tmp/wb-lock/wt-usb is locked — lives on the USB stick, do not prune`，`--json` 里 `locked_reason` 正确；页面改动过 `sloplint`（`clean: 0 tells, 0 failures`）。

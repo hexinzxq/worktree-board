@@ -184,7 +184,19 @@ class FreshRepoScanTests(FreshRepoCase):
         self.assertEqual(len(entries), 2)
         self.assertEqual(entries[1]["path"], "/tmp/r/line\nbreak")
         self.assertTrue(entries[1]["locked"])
+        self.assertEqual(entries[1]["locked_reason"], "")  # a bare `locked` has no reason
         self.assertIsNone(entries[1]["branch"])
+
+    def test_a_lock_reason_is_kept_not_just_the_flag(self) -> None:
+        from worktree_board.scan import _parse_list
+        listing = (
+            "worktree /tmp/r\0HEAD abc\0branch refs/heads/main\0\0"
+            "worktree /tmp/r/usb\0HEAD def\0branch refs/heads/usb\0"
+            "locked lives on the USB stick, do not prune\0\0"
+        )
+        entries = _parse_list(listing)
+        self.assertTrue(entries[1]["locked"])
+        self.assertEqual(entries[1]["locked_reason"], "lives on the USB stick, do not prune")
 
     def test_a_hung_git_call_becomes_a_sentence_not_a_wait(self) -> None:
         import subprocess

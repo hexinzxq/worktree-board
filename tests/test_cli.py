@@ -423,6 +423,22 @@ class LsTests(RepoCase):
             process.terminate()
             process.communicate(timeout=10)
 
+    def test_a_lock_reason_is_shown_next_to_the_badge(self) -> None:
+        path = self.add_worktree("wt-usb")
+        git("worktree", "lock", "--reason", "lives on the USB stick, do not prune",
+            str(path), cwd=self.repo)
+        code, out = run("ls", "-C", str(self.repo))
+        self.assertEqual(code, 0)
+        self.assertIn("(locked)", out)
+        self.assertIn("is locked — lives on the USB stick, do not prune", out)
+        code, out = run("ls", "-C", str(self.repo), "--json")
+        self.assertEqual(code, 0)
+        data = json.loads(out)
+        locked = [tree for tree in data["worktrees"] if tree["path"].endswith("wt-usb")][0]
+        self.assertTrue(locked["locked"])
+        self.assertEqual(locked["locked_reason"], "lives on the USB stick, do not prune")
+        self.assertEqual(data["totals"]["locked"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()
