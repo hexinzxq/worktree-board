@@ -284,8 +284,12 @@ def main(argv: list[str] | None = None) -> int:
             print(f"error: cannot listen on {args.host}:{args.port} — {reason}. "
                   f"Pass --port to pick another.", file=sys.stderr)
             return 2
-        print(f"worktree-board  http://{args.host}:{httpd.server_address[1]}  ({root})")
-        print("ctrl-c to stop")
+        # Flush: piping this into a log (or a supervisor) otherwise holds the
+        # URL in the buffer, and with --port 0 that URL is the only way to know
+        # which port git picked.
+        print(f"worktree-board  http://{args.host}:{httpd.server_address[1]}  ({root})",
+              flush=True)
+        print("ctrl-c to stop", flush=True)
         try:
             httpd.serve_forever()
         except KeyboardInterrupt:

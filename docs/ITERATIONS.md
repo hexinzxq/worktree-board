@@ -198,3 +198,9 @@
 - **改了什么**：表格的 `*` 改成「你 shell 所在的那个 worktree」（`_inside()` 解析后比较相等或父目录），main 改成在分支名后写 `(main)`。新增 3 个用例（星跟着 shell 走、main 仍被标出来、在两个 worktree 之外就不打星）；顺手更新两条期望 `main *` 的老用例。
 - **为什么**：`*` 在 git 里是「当前分支」，这里却一直是「主 worktree」。于是你站在 `feature-x` 里跑 `wtree ls`，star 落在 `main` 那一行，最自然的读法恰好是错的。看板第一眼要回答的是「我在哪、旁边还有谁」。
 - **验证**：65 个测试全过；在 `git worktree add` 出来的副本里跑，`star-demo *` 打在自己那行，`main (main)` 保持标注。
+
+### #32 输出进管道时，`wtree serve` 那行 URL 被缓冲住了
+
+- **改了什么**：启动横幅与 `ctrl-c to stop` 都加 `flush=True`。新增用例：把 `serve --port 0` 的 stdout 接成 PIPE，10 秒内必须读到 `worktree-board  http://127.0.0.1:<port>  (…)`，并断言打印出来的端口不是 0。
+- **为什么**：真实场景——想把 serve 挂到日志里再拿 URL，`> /tmp/srv.out` 之后文件一直是空的：Python 对管道是块缓冲（4KB 才刷），终端里看得见、一进管道就消失。配合 `--port 0` 更糟，那行是唯一会说「选了哪个端口」的地方，缓冲住就等于没有。日志/守护进程/CI 里跑都是这个形状。
+- **验证**：66 个测试全过；把 `flush=True` 去掉单跑新用例会失败（`the banner is still in the buffer, not on stdout`），加回来才过。

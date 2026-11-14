@@ -7,9 +7,11 @@ import json
 import os
 import shutil
 import socket
+import re
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import unittest
 from pathlib import Path
@@ -391,6 +393,35 @@ class LsTests(RepoCase):
             out, _ = process.communicate(timeout=10)
         self.assertGreaterEqual(out.count("\033[2J"), 2)
         self.assertIn("main (main)", out)
+
+    def test_the_url_is_visible_when_stdout_is_a_pipe(self) -> None:
+        # Redirecting into a log is how a supervisor runs this. With a block-
+        # buffered stdout the banner never arrives — and under --port 0 that
+        # banner is the only place the chosen port is ever printed.
+        env = dict(os.environ)
+        env["PYTHONPATH"] = str(ROOT / "src") + os.pathsep + env.get("PYTHONPATH", "")
+        process = subprocess.Popen(
+            [sys.executable, "-m", "worktree_board.cli", "serve",
+             "-C", str(self.repo), "--port", "0"],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env,
+        )
+        lines: list[str] = []
+
+        def read_first_line() -> None:
+            lines.append(process.stdout.readline())
+
+        reader = threading.Thread(target=read_first_line, daemon=True)
+        reader.start()
+        reader.join(10)
+        try:
+            self.assertTrue(lines and lines[0].strip(),
+                            "the banner is still in the buffer, not on stdout")
+            self.assertRegex(lines[0], r"^worktree-board  http://127\.0\.0\.1:\d{2,5}  \(")
+            port = int(re.search(r":(\d+)  ", lines[0]).group(1))
+            self.assertGreater(port, 0)  # --port 0 must report the port git picked
+        finally:
+            process.terminate()
+            process.communicate(timeout=10)
 
 
 if __name__ == "__main__":
